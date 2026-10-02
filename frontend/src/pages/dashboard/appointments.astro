@@ -1,0 +1,13 @@
+---
+/**
+ * Admin Dashboard — Appointment Management Page
+ */
+import DashboardLayout from '@/components/layout/DashboardLayout.astro';
+import AppointmentsManager from '@/components/features/appointments/AppointmentsManager';
+---
+
+<DashboardLayout title="Appointments">
+  <div class="space-y-6">
+    <AppointmentsManager client:load />
+  </div>
+</DashboardLayout>
