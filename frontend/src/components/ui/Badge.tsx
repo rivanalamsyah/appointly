@@ -30,7 +30,7 @@ export const Badge: React.FC<BadgeProps> = ({
   const base =
     'inline-flex items-center gap-1.5 font-medium rounded-full whitespace-nowrap transition-colors';
 
-  const variants = {
+  const variants: Record<NonNullable<BadgeProps['variant']>, string> = {
     pending: 'bg-amber-500/15 text-amber-400 border border-amber-500/30',
     confirmed: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30',
     completed: 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/30',
@@ -44,12 +44,12 @@ export const Badge: React.FC<BadgeProps> = ({
     outline: 'bg-transparent text-text-secondary border border-surface-border',
   };
 
-  const sizes = {
+  const sizes: Record<NonNullable<BadgeProps['size']>, string> = {
     sm: 'px-2 py-0.5 text-[10px]',
     md: 'px-2.5 py-1 text-xs',
   };
 
-  const dotColors = {
+  const dotColors: Record<NonNullable<BadgeProps['variant']>, string> = {
     pending: 'bg-amber-400',
     confirmed: 'bg-emerald-400',
     completed: 'bg-indigo-400',

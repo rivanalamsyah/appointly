@@ -43,7 +43,7 @@ export const Drawer: React.FC<DrawerProps> = ({
 
   if (!isOpen) return null;
 
-  const sizes = {
+  const sizes: Record<NonNullable<DrawerProps['size']>, string> = {
     md: 'max-w-md',
     lg: 'max-w-lg',
     xl: 'max-w-2xl',

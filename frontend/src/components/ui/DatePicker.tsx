@@ -27,7 +27,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     <Input
       type="date"
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
       min={minDate}
       max={maxDate}
       error={error}

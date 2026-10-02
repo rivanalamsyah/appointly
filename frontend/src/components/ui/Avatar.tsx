@@ -20,11 +20,11 @@ export const Avatar: React.FC<AvatarProps> = ({
     .split(' ')
     .filter(Boolean)
     .slice(0, 2)
-    .map((n) => n[0])
+    .map((n: string) => n[0])
     .join('')
     .toUpperCase() || 'U';
 
-  const sizes = {
+  const sizes: Record<'xs' | 'sm' | 'md' | 'lg' | 'xl', string> = {
     xs: 'w-6 h-6 text-[10px]',
     sm: 'w-8 h-8 text-xs',
     md: 'w-10 h-10 text-sm',
@@ -32,7 +32,7 @@ export const Avatar: React.FC<AvatarProps> = ({
     xl: 'w-16 h-16 text-xl',
   };
 
-  const statusColors = {
+  const statusColors: Record<'online' | 'busy' | 'offline', string> = {
     online: 'bg-emerald-500 shadow-emerald-500/50',
     busy: 'bg-amber-500 shadow-amber-500/50',
     offline: 'bg-slate-500 shadow-slate-500/50',

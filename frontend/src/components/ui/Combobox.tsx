@@ -33,11 +33,11 @@ export const Combobox: React.FC<ComboboxProps> = ({
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const selectedOption = options.find((opt) => opt.value === value);
+  const selectedOption = options.find((opt: ComboboxOption) => opt.value === value);
 
   const filteredOptions = query === ''
     ? options
-    : options.filter((opt) =>
+    : options.filter((opt: ComboboxOption) =>
         opt.label.toLowerCase().includes(query.toLowerCase()) ||
         (opt.sublabel && opt.sublabel.toLowerCase().includes(query.toLowerCase()))
       );

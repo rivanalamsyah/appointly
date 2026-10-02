@@ -16,7 +16,7 @@ export const Card: React.FC<CardProps> = ({
 }) => {
   const base = 'rounded-xl overflow-hidden transition-all duration-200';
 
-  const variants = {
+  const variants: Record<NonNullable<CardProps['variant']>, string> = {
     default: 'bg-surface-raised border border-surface-border shadow-md',
     glass: 'bg-surface-raised/70 backdrop-blur-md border border-white/[0.08] shadow-xl',
     bordered: 'bg-transparent border border-surface-border',

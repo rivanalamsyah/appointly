@@ -50,7 +50,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
             align === 'right' ? 'right-0' : 'left-0'
           )}
         >
-          {items.map((item, index) => {
+          {items.map((item: DropdownItem, index: number) => {
             if (item.divider) {
               return <div key={`divider-${index}`} className="my-1 border-t border-surface-border" />;
             }
