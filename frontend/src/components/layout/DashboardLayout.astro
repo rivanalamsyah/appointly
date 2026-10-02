@@ -29,6 +29,14 @@ const { title, description = 'Appointly — Appointment Management Platform' } =
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   </head>
   <body class="bg-[var(--color-surface-base)] text-[var(--color-text-primary)] overflow-hidden">
+    <!-- Skip to main content link for screen readers & keyboard navigation -->
+    <a
+      href="#main-content"
+      class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-indigo-600 focus:text-white focus:rounded-lg focus:shadow-lg focus:outline-none"
+    >
+      Skip to main content
+    </a>
+
     <div class="flex h-screen">
       <!-- Sidebar -->
       <Sidebar />
@@ -41,7 +49,7 @@ const { title, description = 'Appointly — Appointment Management Platform' } =
         <!-- Page Content -->
         <main
           id="main-content"
-          class="flex-1 overflow-y-auto p-6 focus:outline-none"
+          class="flex-1 overflow-y-auto p-4 sm:p-6 focus:outline-none"
           tabindex="-1"
         >
           <div class="max-w-screen-2xl mx-auto animate-fade-in">
@@ -50,5 +58,33 @@ const { title, description = 'Appointly — Appointment Management Platform' } =
         </main>
       </div>
     </div>
+
+    <!-- Script for mobile menu open/close drawer handling -->
+    <script>
+      const toggleBtn = document.getElementById('mobile-menu-toggle');
+      const closeBtn = document.getElementById('sidebar-close-btn');
+      const sidebar = document.getElementById('sidebar');
+      const backdrop = document.getElementById('sidebar-backdrop');
+
+      function openSidebar() {
+        if (sidebar && backdrop) {
+          sidebar.classList.remove('-translate-x-full');
+          backdrop.classList.remove('hidden');
+          setTimeout(() => backdrop.classList.remove('opacity-0'), 10);
+        }
+      }
+
+      function closeSidebar() {
+        if (sidebar && backdrop) {
+          sidebar.classList.add('-translate-x-full');
+          backdrop.classList.add('opacity-0');
+          setTimeout(() => backdrop.classList.add('hidden'), 300);
+        }
+      }
+
+      toggleBtn?.addEventListener('click', openSidebar);
+      closeBtn?.addEventListener('click', closeSidebar);
+      backdrop?.addEventListener('click', closeSidebar);
+    </script>
   </body>
 </html>

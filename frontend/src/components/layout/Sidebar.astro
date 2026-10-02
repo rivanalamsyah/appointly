@@ -50,14 +50,21 @@ function isActive(href: string): boolean {
 }
 ---
 
+<!-- Mobile Overlay Backdrop -->
+<div
+  id="sidebar-backdrop"
+  class="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 hidden md:hidden transition-opacity duration-300 opacity-0"
+  aria-hidden="true"
+></div>
+
 <aside
   id="sidebar"
-  class="w-[260px] h-full flex flex-col bg-[var(--color-surface-raised)] border-r border-[var(--color-surface-border)] flex-shrink-0"
+  class="fixed md:static inset-y-0 left-0 z-40 w-[260px] h-full flex flex-col bg-[var(--color-surface-raised)] border-r border-[var(--color-surface-border)] flex-shrink-0 transition-transform duration-300 ease-in-out -translate-x-full md:translate-x-0"
   role="navigation"
   aria-label="Main navigation"
 >
   <!-- Logo -->
-  <div class="h-[64px] flex items-center px-5 border-b border-[var(--color-surface-border)]">
+  <div class="h-[64px] flex items-center justify-between px-5 border-b border-[var(--color-surface-border)]">
     <a href="/dashboard" class="flex items-center gap-3 group" aria-label="Appointly home">
       <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.4)] group-hover:shadow-[0_0_30px_rgba(99,102,241,0.6)] transition-all duration-300">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -72,6 +79,17 @@ function isActive(href: string): boolean {
         Appoint<span class="text-gradient">ly</span>
       </span>
     </a>
+
+    <!-- Mobile Close Button -->
+    <button
+      id="sidebar-close-btn"
+      class="md:hidden p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-white hover:bg-white/10 transition-colors"
+      aria-label="Close menu"
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+      </svg>
+    </button>
   </div>
 
   <!-- Navigation -->
@@ -91,7 +109,6 @@ function isActive(href: string): boolean {
                   class={`sidebar-item ${active ? 'active' : ''}`}
                   aria-current={active ? 'page' : undefined}
                 >
-                  <!-- Icon placeholder — will be replaced with lucide icons via React -->
                   <svg
                     width="17"
                     height="17"
@@ -151,3 +168,4 @@ function isActive(href: string): boolean {
     </button>
   </div>
 </aside>
+

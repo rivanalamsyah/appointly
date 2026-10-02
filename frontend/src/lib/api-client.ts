@@ -21,7 +21,7 @@ export const apiClient = ky.create({
   timeout: 15000,
   hooks: {
     beforeRequest: [
-      (request) => {
+      (request: Request) => {
         const token = getAuthToken();
         if (token) {
           request.headers.set('Authorization', `Bearer ${token}`);
@@ -33,7 +33,7 @@ export const apiClient = ky.create({
       },
     ],
     afterResponse: [
-      async (_request, _options, response) => {
+      async (_request: Request, _options: unknown, response: Response) => {
         if (response.status === 401 && typeof window !== 'undefined') {
           // Token expired or invalid
           localStorage.removeItem('appointly_auth_token');

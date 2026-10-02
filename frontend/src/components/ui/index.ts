@@ -16,3 +16,8 @@ export * from './Card';
 export * from './EmptyState';
 export * from './Skeleton';
 export * from './Toast';
+export * from './Tooltip';
+export * from './Separator';
+export * from './Switch';
+export * from './Checkbox';
+
