@@ -4,41 +4,48 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/appointly/appointly/backend/internal/domain/appointment"
-	"github.com/appointly/appointly/backend/internal/domain/scheduling"
+	"github.com/appointly/appointly/backend/internal/domain/availability"
+	"github.com/appointly/appointly/backend/internal/domain/organization"
 	v1 "github.com/appointly/appointly/backend/internal/handler/v1"
-	"github.com/appointly/appointly/backend/internal/middleware"
 	"github.com/appointly/appointly/backend/internal/pkg/apperror"
+	availabilityuc "github.com/appointly/appointly/backend/internal/usecase/availability"
 )
 
 // PublicHandler serves unauthenticated customer-facing API endpoints.
 type PublicHandler struct {
-	availabilityService scheduling.AvailabilityService
-	appointmentService  appointment.Service
+	orgRepo            organization.Repository
+	availabilityEngine *availabilityuc.Engine
+	appointmentService appointment.Service
 }
 
 // NewPublicHandler constructs a PublicHandler instance.
-func NewPublicHandler(schedSvc scheduling.AvailabilityService, apptSvc appointment.Service) *PublicHandler {
+func NewPublicHandler(
+	orgRepo organization.Repository,
+	availabilityEngine *availabilityuc.Engine,
+	apptSvc appointment.Service,
+) *PublicHandler {
 	return &PublicHandler{
-		availabilityService: schedSvc,
+		orgRepo:            orgRepo,
+		availabilityEngine: availabilityEngine,
 		appointmentService:  apptSvc,
 	}
 }
 
-// SearchSlotsRequest defines query params for dynamic slot search.
-type SearchSlotsRequest struct {
-	ServiceID string `json:"service_id"`
-	StaffID   string `json:"staff_id,omitempty"`
-	Date      string `json:"date"` // YYYY-MM-DD
-}
-
-// GetAvailableSlots handles GET /api/v1/public/slots
-func (h *PublicHandler) GetAvailableSlots(w http.ResponseWriter, r *http.Request) {
+// GetPublicAvailability handles GET /api/v1/public/{slug}/availability
+func (h *PublicHandler) GetPublicAvailability(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	tenant, err := middleware.TenantFromContext(ctx)
+	slug := chi.URLParam(r, "slug")
+	if slug == "" {
+		v1.RespondError(w, r, apperror.BadRequest("organization slug is required"))
+		return
+	}
+
+	org, err := h.orgRepo.GetBySlug(ctx, slug)
 	if err != nil {
-		v1.RespondError(w, r, err)
+		v1.RespondError(w, r, apperror.NotFound("organization not found"))
 		return
 	}
 
@@ -55,64 +62,87 @@ func (h *PublicHandler) GetAvailableSlots(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	dateStr := q.Get("date")
-	if dateStr == "" {
-		v1.RespondError(w, r, apperror.BadRequest("date query parameter is required (YYYY-MM-DD)"))
-		return
+	dateFromStr := q.Get("date_from")
+	if dateFromStr == "" {
+		dateFromStr = q.Get("date") // fallback
 	}
 
-	targetDate, parseErr := time.Parse("2006-01-02", dateStr)
-	if parseErr != nil {
-		v1.RespondError(w, r, apperror.BadRequest("invalid date format, expected YYYY-MM-DD"))
-		return
+	now := time.Now().UTC()
+	dateFrom := now
+	if dateFromStr != "" {
+		if parsed, pErr := time.Parse("2006-01-02", dateFromStr); pErr == nil {
+			dateFrom = parsed
+		}
+	}
+
+	dateToStr := q.Get("date_to")
+	dateTo := dateFrom
+	if dateToStr != "" {
+		if parsed, pErr := time.Parse("2006-01-02", dateToStr); pErr == nil {
+			dateTo = parsed
+		}
+	}
+
+	var locationID *uuid.UUID
+	if locStr := q.Get("location_id"); locStr != "" {
+		if id, pErr := uuid.Parse(locStr); pErr == nil {
+			locationID = &id
+		}
 	}
 
 	var staffID *uuid.UUID
 	if staffStr := q.Get("staff_id"); staffStr != "" {
-		id, err := uuid.Parse(staffStr)
-		if err != nil {
-			v1.RespondError(w, r, apperror.BadRequest("invalid staff_id UUID"))
-			return
+		if id, pErr := uuid.Parse(staffStr); pErr == nil {
+			staffID = &id
 		}
-		staffID = &id
 	}
 
-	req := scheduling.AvailabilityRequest{
-		OrganizationID: tenant.ID,
+	tz := q.Get("timezone")
+
+	availQuery := availability.GetAvailabilityQuery{
+		OrganizationID: org.ID,
+		LocationID:     locationID,
 		ServiceID:      serviceID,
 		StaffID:        staffID,
-		Date:           targetDate,
-		Timezone:       "UTC",
+		DateFrom:       dateFrom,
+		DateTo:         dateTo,
+		Timezone:       tz,
 	}
 
-	result, searchErr := h.availabilityService.GetAvailableSlots(ctx, req)
+	slots, searchErr := h.availabilityEngine.GetAvailableSlots(ctx, availQuery)
 	if searchErr != nil {
 		v1.RespondError(w, r, searchErr)
 		return
 	}
 
-	v1.RespondJSON(w, r, http.StatusOK, result)
+	v1.RespondJSON(w, r, http.StatusOK, slots)
 }
 
 // CreateBookingRequest defines payload for public appointment creation.
 type CreateBookingRequest struct {
-	ServiceID        uuid.UUID  `json:"service_id"`
-	StaffID          *uuid.UUID `json:"staff_id,omitempty"`
-	LocationID       *uuid.UUID `json:"location_id,omitempty"`
-	StartTime        time.Time  `json:"start_time"`
-	CustomerName     string     `json:"customer_name"`
-	CustomerEmail    string     `json:"customer_email"`
-	CustomerPhone    string     `json:"customer_phone"`
-	Notes            string     `json:"notes,omitempty"`
-	IdempotencyKey   string     `json:"idempotency_key,omitempty"`
+	ServiceID      uuid.UUID  `json:"service_id"`
+	StaffID        *uuid.UUID `json:"staff_id,omitempty"`
+	LocationID     *uuid.UUID `json:"location_id,omitempty"`
+	StartTime      time.Time  `json:"start_time"`
+	CustomerName   string     `json:"customer_name"`
+	CustomerEmail  string     `json:"customer_email"`
+	CustomerPhone  string     `json:"customer_phone"`
+	Notes          string     `json:"notes,omitempty"`
+	IdempotencyKey string     `json:"idempotency_key,omitempty"`
 }
 
-// CreatePublicBooking handles POST /api/v1/public/appointments
+// CreatePublicBooking handles POST /api/v1/public/{slug}/appointments
 func (h *PublicHandler) CreatePublicBooking(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	tenant, err := middleware.TenantFromContext(ctx)
+	slug := chi.URLParam(r, "slug")
+	if slug == "" {
+		v1.RespondError(w, r, apperror.BadRequest("organization slug is required"))
+		return
+	}
+
+	org, err := h.orgRepo.GetBySlug(ctx, slug)
 	if err != nil {
-		v1.RespondError(w, r, err)
+		v1.RespondError(w, r, apperror.NotFound("organization not found"))
 		return
 	}
 
@@ -122,7 +152,6 @@ func (h *PublicHandler) CreatePublicBooking(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Basic validation
 	if req.CustomerName == "" || req.CustomerEmail == "" || req.CustomerPhone == "" {
 		v1.RespondError(w, r, apperror.ValidationFailed("customer name, email, and phone are required"))
 		return
@@ -139,7 +168,7 @@ func (h *PublicHandler) CreatePublicBooking(w http.ResponseWriter, r *http.Reque
 	}
 
 	cmd := appointment.CreateAppointmentCmd{
-		OrganizationID: tenant.ID,
+		OrganizationID: org.ID,
 		ServiceID:      req.ServiceID,
 		StaffID:        staffID,
 		LocationID:     locationID,
@@ -158,4 +187,12 @@ func (h *PublicHandler) CreatePublicBooking(w http.ResponseWriter, r *http.Reque
 	}
 
 	v1.RespondCreated(w, r, appt)
+}
+
+// Helper registration for Chi router
+func (h *PublicHandler) RegisterRoutes(r chi.Router) {
+	r.Route("/public/{slug}", func(r chi.Router) {
+		r.Get("/availability", h.GetPublicAvailability)
+		r.Post("/appointments", h.CreatePublicBooking)
+	})
 }

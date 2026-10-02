@@ -303,3 +303,61 @@ Jobs are enqueued transactionally using **River** (Postgres-backed):
 | 6 | UUIDv7 for public IDs | Time-ordered, K-sortable | Auto-increment, UUIDv4 |
 | 7 | Astro Islands | Partial hydration, best perf | Next.js, pure SPA |
 | 8 | Selective soft delete | Only where audit/recovery needed | Universal soft delete |
+| 9 | Availability Engine | Stateless candidate slot pipeline; atomic lock at booking | Hardcoded static 30m slots |
+
+---
+
+## 9. Availability Engine Architecture & Pipeline Algorithm
+
+The **Availability Engine** is a high-performance, stateless application service (`internal/usecase/availability`) designed to compute valid candidate booking slots dynamically.
+
+### Key Design Guarantee
+- **Dynamic Slot Generation**: Slot starts and durations are computed on-the-fly based on `service.DurationMinutes` + `service.BufferBefore` + `service.BufferAfter` stepped by configurable `organization.Settings.SlotGranularityMinutes` (e.g., 15m, 30m, 60m). Static hard-coded slot grids are strictly avoided.
+- **Candidate Non-Reservation**: Availability slots are stateless candidate suggestions. To prevent race conditions, the final appointment creation step performs an atomic transaction lock (`SELECT FOR UPDATE`) on the target staff and resource window.
+
+### Pipeline Algorithm Phases
+
+```
+[Query Input] (org, location, service, staff, date_range, timezone)
+      │
+      ▼
+┌─────────────────────────────────────────────────────────────┐
+│ Phase 1: Service Status & Duration Calculation              │
+│ - Verify service.Status == ACTIVE                          │
+│ - totalSlotDuration = BufferBefore + Duration + BufferAfter │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│ Phase 2: Organization Settings & Advance Notice Bounds      │
+│ - earliestAllowed = now + MinAdvanceBookingHours            │
+│ - latestAllowed   = now + MaxAdvanceDays                    │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│ Phase 3: Staff Candidates & Location Intersections          │
+│ - Filter ACTIVE staff assigned to the requested Service     │
+│ - Intersect Location Business Hours with Staff Shift Hours │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│ Phase 4: Time Window Subtractions (Pure Set Math)            │
+│ - Subtract Staff Breaks from shift windows                  │
+│ - Subtract Approved Staff Time-Off entries                  │
+│ - Subtract Existing Appointments + Buffer Windows           │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│ Phase 5: Resource Constraints & Granular Slot Step          │
+│ - Verify at least 1 assigned Resource is ACTIVE & free      │
+│ - Iterate t in steps of SlotGranularityMinutes              │
+│ - Filter slots within [earliestAllowed, latestAllowed]      │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+[Formatted & Chronologically Sorted Slots Output]
+```
+

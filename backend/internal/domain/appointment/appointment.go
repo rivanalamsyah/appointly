@@ -122,6 +122,7 @@ type CreateAppointmentCmd struct {
 	CustomerID     *uuid.UUID
 	ResourceID     *uuid.UUID
 	StartTime      time.Time
+	EndTime        time.Time
 	Timezone       string
 	GuestName      string
 	GuestEmail     string
