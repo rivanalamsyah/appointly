@@ -105,6 +105,7 @@ CREATE INDEX idx_appointments_service ON appointments (service_id);
 CREATE INDEX idx_appointments_status ON appointments (organization_id, status);
 CREATE INDEX idx_appointments_date_range ON appointments (organization_id, start_time, end_time);
 CREATE INDEX idx_appointments_resource ON appointments (resource_id) WHERE resource_id IS NOT NULL;
+CREATE INDEX idx_appointments_payment ON appointments (payment_id) WHERE payment_id IS NOT NULL;
 
 -- Critical index for availability engine: detect staff schedule conflicts.
 -- Only active appointments (not cancelled/no_show) block slots.

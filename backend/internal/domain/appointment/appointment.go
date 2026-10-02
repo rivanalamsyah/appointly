@@ -26,7 +26,7 @@ const (
 // ValidTransitions defines allowed status transitions for appointment lifecycle.
 // Key: current status, Value: allowed next statuses.
 var ValidTransitions = map[Status][]Status{
-	StatusPending:     {StatusConfirmed, StatusCancelled},
+	StatusPending:     {StatusConfirmed, StatusRescheduled, StatusCancelled},
 	StatusConfirmed:   {StatusRescheduled, StatusCompleted, StatusCancelled, StatusNoShow},
 	StatusRescheduled: {StatusConfirmed, StatusCompleted, StatusCancelled, StatusNoShow},
 	StatusCompleted:   {}, // terminal state
