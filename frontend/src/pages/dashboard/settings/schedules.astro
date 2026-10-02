@@ -1,0 +1,13 @@
+---
+/**
+ * Admin Dashboard — Settings Schedules Page
+ */
+import DashboardLayout from '@/components/layout/DashboardLayout.astro';
+import ScheduleManager from '@/components/features/scheduling/ScheduleManager';
+---
+
+<DashboardLayout title="Schedules & Business Hours">
+  <div class="space-y-6">
+    <ScheduleManager client:load />
+  </div>
+</DashboardLayout>

@@ -1,0 +1,13 @@
+---
+/**
+ * Admin Dashboard — Interactive Calendar View Page
+ */
+import DashboardLayout from '@/components/layout/DashboardLayout.astro';
+import CalendarView from '@/components/features/calendar/CalendarView';
+---
+
+<DashboardLayout title="Calendar Schedule">
+  <div class="space-y-6">
+    <CalendarView client:load />
+  </div>
+</DashboardLayout>

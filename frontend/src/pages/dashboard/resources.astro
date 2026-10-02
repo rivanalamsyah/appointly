@@ -1,0 +1,13 @@
+---
+/**
+ * Admin Dashboard — Resource Management Page
+ */
+import DashboardLayout from '@/components/layout/DashboardLayout.astro';
+import ResourcesManager from '@/components/features/resources/ResourcesManager';
+---
+
+<DashboardLayout title="Resource Management">
+  <div class="space-y-6">
+    <ResourcesManager client:load />
+  </div>
+</DashboardLayout>

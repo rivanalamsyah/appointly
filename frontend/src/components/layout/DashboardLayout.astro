@@ -1,0 +1,54 @@
+---
+/**
+ * DashboardLayout — Shell for the authenticated admin dashboard.
+ * Provides sidebar navigation, topbar, and main content area.
+ * All dashboard pages must use this layout.
+ */
+import '@/styles/global.css';
+import Sidebar from '@/components/layout/Sidebar.astro';
+import Topbar from '@/components/layout/Topbar.astro';
+
+export interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = 'Appointly — Appointment Management Platform' } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{title} — Appointly</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  </head>
+  <body class="bg-[var(--color-surface-base)] text-[var(--color-text-primary)] overflow-hidden">
+    <div class="flex h-screen">
+      <!-- Sidebar -->
+      <Sidebar />
+
+      <!-- Main Content Area -->
+      <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <!-- Topbar -->
+        <Topbar title={title} />
+
+        <!-- Page Content -->
+        <main
+          id="main-content"
+          class="flex-1 overflow-y-auto p-6 focus:outline-none"
+          tabindex="-1"
+        >
+          <div class="max-w-screen-2xl mx-auto animate-fade-in">
+            <slot />
+          </div>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

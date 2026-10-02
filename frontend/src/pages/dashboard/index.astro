@@ -1,0 +1,12 @@
+---
+/**
+ * Dashboard Index — Main overview page.
+ * Shows key metrics, upcoming appointments, and quick actions.
+ */
+import DashboardLayout from '@/components/layout/DashboardLayout.astro';
+import DashboardOverview from '@/components/features/appointments/DashboardOverview';
+---
+
+<DashboardLayout title="Dashboard">
+  <DashboardOverview client:load />
+</DashboardLayout>

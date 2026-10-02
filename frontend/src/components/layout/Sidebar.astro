@@ -1,0 +1,153 @@
+---
+/**
+ * Sidebar — Primary navigation for the authenticated dashboard.
+ * Implements accessible navigation with keyboard support.
+ */
+const currentPath = Astro.url.pathname;
+
+const navItems = [
+  {
+    group: 'Overview',
+    items: [
+      { href: '/dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
+      { href: '/dashboard/calendar', label: 'Calendar', icon: 'calendar-days' },
+      { href: '/dashboard/appointments', label: 'Appointments', icon: 'calendar-check' },
+    ]
+  },
+  {
+    group: 'Business',
+    items: [
+      { href: '/dashboard/customers', label: 'Customers', icon: 'users' },
+      { href: '/dashboard/staff', label: 'Staff', icon: 'user-tie' },
+      { href: '/dashboard/services', label: 'Services', icon: 'scissors' },
+      { href: '/dashboard/schedules', label: 'Schedules', icon: 'calendar-days' },
+      { href: '/dashboard/locations', label: 'Locations', icon: 'map-pin' },
+      { href: '/dashboard/resources', label: 'Resources', icon: 'box' },
+    ]
+  },
+  {
+    group: 'Finance',
+    items: [
+      { href: '/dashboard/payments', label: 'Payments', icon: 'credit-card' },
+      { href: '/dashboard/reports', label: 'Reports', icon: 'bar-chart-3' },
+    ]
+  },
+  {
+    group: 'Account',
+    items: [
+      { href: '/dashboard/notifications', label: 'Notifications', icon: 'bell' },
+      { href: '/dashboard/team', label: 'Team & Roles', icon: 'users-round' },
+      { href: '/dashboard/billing', label: 'Billing', icon: 'receipt' },
+      { href: '/dashboard/integrations', label: 'Integrations', icon: 'plug' },
+      { href: '/dashboard/settings', label: 'Settings', icon: 'settings' },
+    ]
+  },
+];
+
+function isActive(href: string): boolean {
+  if (href === '/dashboard') return currentPath === '/dashboard';
+  return currentPath.startsWith(href);
+}
+---
+
+<aside
+  id="sidebar"
+  class="w-[260px] h-full flex flex-col bg-[var(--color-surface-raised)] border-r border-[var(--color-surface-border)] flex-shrink-0"
+  role="navigation"
+  aria-label="Main navigation"
+>
+  <!-- Logo -->
+  <div class="h-[64px] flex items-center px-5 border-b border-[var(--color-surface-border)]">
+    <a href="/dashboard" class="flex items-center gap-3 group" aria-label="Appointly home">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.4)] group-hover:shadow-[0_0_30px_rgba(99,102,241,0.6)] transition-all duration-300">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect width="18" height="18" x="3" y="4" rx="2" ry="2"/>
+          <line x1="16" x2="16" y1="2" y2="6"/>
+          <line x1="8" x2="8" y1="2" y2="6"/>
+          <line x1="3" x2="21" y1="10" y2="10"/>
+          <path d="m9 16 2 2 4-4"/>
+        </svg>
+      </div>
+      <span class="font-bold text-[15px] tracking-tight text-white font-[var(--font-display)]">
+        Appoint<span class="text-gradient">ly</span>
+      </span>
+    </a>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-6">
+    {navItems.map((group) => (
+      <div>
+        <p class="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--color-text-muted)]">
+          {group.group}
+        </p>
+        <ul class="space-y-0.5" role="list">
+          {group.items.map((item) => {
+            const active = isActive(item.href);
+            return (
+              <li>
+                <a
+                  href={item.href}
+                  class={`sidebar-item ${active ? 'active' : ''}`}
+                  aria-current={active ? 'page' : undefined}
+                >
+                  <!-- Icon placeholder — will be replaced with lucide icons via React -->
+                  <svg
+                    width="17"
+                    height="17"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                    class="flex-shrink-0"
+                  >
+                    {item.icon === 'layout-dashboard' && <><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></>}
+                    {item.icon === 'calendar-days' && <><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></>}
+                    {item.icon === 'calendar-check' && <><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="m9 16 2 2 4-4"/></>}
+                    {item.icon === 'users' && <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>}
+                    {item.icon === 'user-tie' && <><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z"/><path d="M4 20c0-4 3.58-7 8-7s8 3 8 7"/><path d="m11 12-.75 2.5L12 17l1-2.5L12 12"/></>}
+                    {item.icon === 'scissors' && <><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></>}
+                    {item.icon === 'map-pin' && <><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></>}
+                    {item.icon === 'box' && <><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></>}
+                    {item.icon === 'credit-card' && <><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></>}
+                    {item.icon === 'bar-chart-3' && <><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></>}
+                    {item.icon === 'bell' && <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></>}
+                    {item.icon === 'users-round' && <><path d="M18 21a8 8 0 0 0-16 0"/><circle cx="10" cy="8" r="5"/><path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"/></>}
+                    {item.icon === 'receipt' && <><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8H8"/><path d="M16 12H8"/><path d="M12 16H8"/></>}
+                    {item.icon === 'plug' && <><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8H6a2 2 0 0 0-2 2v3a6 6 0 0 0 12 0v-3a2 2 0 0 0-2-2Z"/></>}
+                    {item.icon === 'settings' && <><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></>}
+                  </svg>
+                  <span>{item.label}</span>
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    ))}
+  </nav>
+
+  <!-- User Profile -->
+  <div class="p-3 border-t border-[var(--color-surface-border)]">
+    <button
+      id="user-menu-trigger"
+      class="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-[rgba(255,255,255,0.05)] transition-colors duration-150 group"
+      aria-haspopup="menu"
+      aria-expanded="false"
+    >
+      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-violet-500 flex items-center justify-center flex-shrink-0 text-white text-xs font-semibold">
+        JD
+      </div>
+      <div class="flex-1 min-w-0 text-left">
+        <p class="text-sm font-medium text-[var(--color-text-primary)] truncate">John Doe</p>
+        <p class="text-xs text-[var(--color-text-muted)] truncate">john@example.com</p>
+      </div>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-[var(--color-text-muted)] group-hover:text-[var(--color-text-secondary)] transition-colors flex-shrink-0">
+        <path d="M7 15l5 5 5-5"/><path d="M7 9l5-5 5 5"/>
+      </svg>
+    </button>
+  </div>
+</aside>

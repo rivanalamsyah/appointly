@@ -1,0 +1,13 @@
+---
+/**
+ * Admin Dashboard — Locations Management Page
+ */
+import DashboardLayout from '@/components/layout/DashboardLayout.astro';
+import LocationsManager from '@/components/features/settings/LocationsManager';
+---
+
+<DashboardLayout title="Location Management">
+  <div class="space-y-6">
+    <LocationsManager client:load />
+  </div>
+</DashboardLayout>

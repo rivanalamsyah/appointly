@@ -1,0 +1,13 @@
+---
+/**
+ * Admin Dashboard — Customer CRM Management Page
+ */
+import DashboardLayout from '@/components/layout/DashboardLayout.astro';
+import CustomersManager from '@/components/features/customers/CustomersManager';
+---
+
+<DashboardLayout title="Customer CRM">
+  <div class="space-y-6">
+    <CustomersManager client:load />
+  </div>
+</DashboardLayout>

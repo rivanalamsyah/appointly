@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS resources;
+DROP TABLE IF EXISTS business_hours;
+DROP TABLE IF EXISTS locations;
