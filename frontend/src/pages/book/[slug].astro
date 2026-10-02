@@ -2,13 +2,17 @@
 /**
  * Public Customer Booking Page
  * Route: /book/[slug] (e.g. /book/luxe-salon)
- * Displays tenant-branded booking wizard.
+ * Displays tenant-branded mobile-first booking wizard with SEO meta tags.
  */
 import '@/styles/global.css';
 import BookingWizard from '@/components/features/booking-wizard/BookingWizard';
-import { Calendar, Shield, MapPin, Phone, Mail, Clock } from 'lucide-react';
+import { MapPin, ShieldCheck } from 'lucide-react';
 
-const { slug } = Astro.params;
+const { slug = 'luxe-salon' } = Astro.params;
+const formattedTitle = slug
+  .split('-')
+  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+  .join(' ');
 ---
 
 <html lang="en" class="dark">
@@ -16,23 +20,27 @@ const { slug } = Astro.params;
     <meta charset="utf-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Book Appointment | Appointly</title>
+    <title>Book Online | {formattedTitle} — Powered by Appointly</title>
+    <meta name="description" content={`Schedule your appointment online with ${formattedTitle}. Select services, specialists, and available real-time time slots instantly.`} />
+    <meta property="og:title" content={`Book Online | ${formattedTitle}`} />
+    <meta property="og:description" content={`Select services and book appointments with ${formattedTitle} seamlessly.`} />
+    <meta property="og:type" content="website" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
   </head>
   <body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen flex flex-col">
     {/* Tenant Public Header */}
-    <header class="bg-slate-900/60 backdrop-blur-xl border-b border-slate-800/80 sticky top-0 z-50">
+    <header class="bg-slate-900/80 backdrop-blur-xl border-b border-slate-800/80 sticky top-0 z-50">
       <div class="max-w-5xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-white font-extrabold shadow-lg shadow-violet-900/40">
-            L
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-white font-extrabold shadow-lg shadow-violet-900/40 text-lg">
+            {formattedTitle.charAt(0)}
           </div>
           <div>
-            <h1 class="text-lg font-bold text-white tracking-tight">Luxe Salon & Spa</h1>
+            <h1 class="text-base sm:text-lg font-bold text-white tracking-tight">{formattedTitle}</h1>
             <p class="text-xs text-slate-400 flex items-center gap-1">
-              <MapPin class="w-3 h-3 text-violet-400" /> 123 Beauty Blvd, Downtown
+              <MapPin class="w-3 h-3 text-violet-400" /> Online Scheduling Portal
             </p>
           </div>
         </div>
@@ -40,20 +48,23 @@ const { slug } = Astro.params;
         <div class="flex items-center gap-4 text-xs text-slate-400">
           <span class="hidden sm:flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-full font-medium">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            Open for Bookings
+            Live Booking
           </span>
         </div>
       </div>
     </header>
 
     {/* Main Content Area */}
-    <main class="flex-1 py-10 px-4 sm:px-6">
+    <main class="flex-1 py-8 px-4 sm:px-6">
       <BookingWizard client:load tenantSlug={slug} />
     </main>
 
     {/* Footer */}
     <footer class="bg-slate-950 border-t border-slate-800/80 py-8 text-center text-xs text-slate-500">
-      <p>Powered by <strong class="text-slate-400">Appointly SaaS</strong> — Secure 256-Bit Encrypted Booking Engine</p>
+      <p className="flex items-center justify-center gap-1.5">
+        <ShieldCheck className="w-4 h-4 text-emerald-400" />
+        Powered by <strong class="text-slate-400">Appointly SaaS</strong> — 256-Bit Encrypted Booking Engine
+      </p>
     </footer>
   </body>
 </html>

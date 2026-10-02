@@ -82,6 +82,12 @@ func (s *Service) CreateAppointment(ctx context.Context, cmd appointment.CreateA
 	}
 
 	// Snapshot historical price and currency
+	if cmd.PriceCents == 0 {
+		cmd.PriceCents = svc.PriceCents
+	}
+	if cmd.Currency == "" {
+		cmd.Currency = svc.Currency
+	}
 	if cmd.Source == "" {
 		cmd.Source = "online"
 	}

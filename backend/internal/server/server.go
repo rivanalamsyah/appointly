@@ -14,6 +14,7 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 
 	"github.com/appointly/appointly/backend/internal/config"
+	"github.com/appointly/appointly/backend/internal/handler/v1/public"
 	"github.com/appointly/appointly/backend/internal/middleware"
 	"github.com/appointly/appointly/backend/internal/pkg/logger"
 )
@@ -28,13 +29,9 @@ type Server struct {
 // Dependencies holds all the injected dependencies for the server.
 // This struct grows as we add more handlers/use cases.
 type Dependencies struct {
-	Config *config.Config
-	Logger *logger.Logger
-	// Handlers will be added here as we build each domain
-	// AuthHandler     *v1.AuthHandler
-	// OrgHandler      *v1.OrganizationHandler
-	// AppointmentHandler *v1.AppointmentHandler
-	// PublicHandler   *v1.public.Handler
+	Config        *config.Config
+	Logger        *logger.Logger
+	PublicHandler *public.PublicHandler
 }
 
 // New creates a new Server with the given dependencies.
@@ -159,13 +156,11 @@ func (s *Server) setupRoutes(r *chi.Mux, deps Dependencies) {
 		})
 
 		// Public booking API — no authentication required, rate-limited
-		r.Route("/public", func(r chi.Router) {
+		r.Group(func(r chi.Router) {
 			r.Use(middleware.PublicRateLimit(deps.Config))
-			// TODO: mount PublicHandler routes
-			// r.Get("/businesses/{slug}", deps.PublicHandler.GetBusiness)
-			// r.Get("/businesses/{slug}/services", deps.PublicHandler.ListServices)
-			// r.Get("/businesses/{slug}/availability", deps.PublicHandler.GetAvailability)
-			// r.Post("/businesses/{slug}/bookings", deps.PublicHandler.CreateBooking)
+			if deps.PublicHandler != nil {
+				deps.PublicHandler.RegisterRoutes(r)
+			}
 		})
 	})
 

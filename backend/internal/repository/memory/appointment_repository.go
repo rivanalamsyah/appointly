@@ -57,6 +57,8 @@ func (r *AppointmentRepository) Create(ctx context.Context, cmd appointment.Crea
 		EndTime:        endTime,
 		Timezone:       cmd.Timezone,
 		Status:         appointment.StatusPending,
+		PriceCents:     cmd.PriceCents,
+		Currency:       cmd.Currency,
 		GuestName:      strings.TrimSpace(cmd.GuestName),
 		GuestEmail:     strings.TrimSpace(cmd.GuestEmail),
 		GuestPhone:     strings.TrimSpace(cmd.GuestPhone),

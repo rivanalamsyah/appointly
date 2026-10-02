@@ -124,6 +124,9 @@ type CreateAppointmentCmd struct {
 	StartTime      time.Time
 	EndTime        time.Time
 	Timezone       string
+	PriceCents     int64
+	Currency       string
+	ServiceName    string
 	GuestName      string
 	GuestEmail     string
 	GuestPhone     string

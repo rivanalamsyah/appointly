@@ -8,15 +8,44 @@ import (
 	"github.com/google/uuid"
 	"github.com/appointly/appointly/backend/internal/domain/appointment"
 	"github.com/appointly/appointly/backend/internal/domain/availability"
+	"github.com/appointly/appointly/backend/internal/domain/location"
 	"github.com/appointly/appointly/backend/internal/domain/organization"
+	"github.com/appointly/appointly/backend/internal/domain/service"
+	"github.com/appointly/appointly/backend/internal/domain/staff"
 	v1 "github.com/appointly/appointly/backend/internal/handler/v1"
 	"github.com/appointly/appointly/backend/internal/pkg/apperror"
 	availabilityuc "github.com/appointly/appointly/backend/internal/usecase/availability"
 )
 
+// PublicOrgDTO represents sanitized organization metadata for public booking pages.
+type PublicOrgDTO struct {
+	ID          uuid.UUID             `json:"id"`
+	Name        string                `json:"name"`
+	Slug        string                `json:"slug"`
+	LogoURL     string                `json:"logo_url,omitempty"`
+	Description string                `json:"description,omitempty"`
+	Phone       string                `json:"phone,omitempty"`
+	Email       string                `json:"email,omitempty"`
+	Timezone    string                `json:"timezone"`
+	Currency    string                `json:"currency"`
+	Settings    organization.Settings `json:"booking_settings"`
+}
+
+// PublicStaffDTO represents sanitized staff profile without sensitive credentials/email.
+type PublicStaffDTO struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	Title     string    `json:"title,omitempty"`
+	Bio       string    `json:"bio,omitempty"`
+	AvatarURL string    `json:"avatar_url,omitempty"`
+}
+
 // PublicHandler serves unauthenticated customer-facing API endpoints.
 type PublicHandler struct {
 	orgRepo            organization.Repository
+	serviceRepo        service.Repository
+	staffRepo          staff.Repository
+	locationRepo       location.Repository
 	availabilityEngine *availabilityuc.Engine
 	appointmentService appointment.Service
 }
@@ -24,17 +53,146 @@ type PublicHandler struct {
 // NewPublicHandler constructs a PublicHandler instance.
 func NewPublicHandler(
 	orgRepo organization.Repository,
+	serviceRepo service.Repository,
+	staffRepo staff.Repository,
+	locationRepo location.Repository,
 	availabilityEngine *availabilityuc.Engine,
 	apptSvc appointment.Service,
 ) *PublicHandler {
 	return &PublicHandler{
 		orgRepo:            orgRepo,
+		serviceRepo:        serviceRepo,
+		staffRepo:          staffRepo,
+		locationRepo:       locationRepo,
 		availabilityEngine: availabilityEngine,
 		appointmentService:  apptSvc,
 	}
 }
 
-// GetPublicAvailability handles GET /api/v1/public/{slug}/availability
+// GetPublicOrganization handles GET /api/v1/public/orgs/{slug}
+func (h *PublicHandler) GetPublicOrganization(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	slug := chi.URLParam(r, "slug")
+	if slug == "" {
+		v1.RespondError(w, r, apperror.BadRequest("organization slug is required"))
+		return
+	}
+
+	org, err := h.orgRepo.GetBySlug(ctx, slug)
+	if err != nil {
+		v1.RespondError(w, r, apperror.NotFound("organization not found"))
+		return
+	}
+
+	dto := PublicOrgDTO{
+		ID:          org.ID,
+		Name:        org.Name,
+		Slug:        org.Slug,
+		LogoURL:     org.LogoURL,
+		Description: org.Description,
+		Phone:       org.Phone,
+		Email:       org.Email,
+		Timezone:    org.Timezone,
+		Currency:    org.Currency,
+		Settings:    org.Settings,
+	}
+
+	v1.RespondJSON(w, r, http.StatusOK, dto)
+}
+
+// GetPublicServices handles GET /api/v1/public/orgs/{slug}/services
+func (h *PublicHandler) GetPublicServices(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	slug := chi.URLParam(r, "slug")
+
+	org, err := h.orgRepo.GetBySlug(ctx, slug)
+	if err != nil {
+		v1.RespondError(w, r, apperror.NotFound("organization not found"))
+		return
+	}
+
+	services, err := h.serviceRepo.ListPublicServices(ctx, org.ID)
+	if err != nil {
+		v1.RespondError(w, r, err)
+		return
+	}
+
+	categories, _ := h.serviceRepo.ListPublicCategories(ctx, org.ID)
+
+	v1.RespondJSON(w, r, http.StatusOK, map[string]interface{}{
+		"services":   services,
+		"categories": categories,
+	})
+}
+
+// GetPublicStaff handles GET /api/v1/public/orgs/{slug}/staff
+func (h *PublicHandler) GetPublicStaff(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	slug := chi.URLParam(r, "slug")
+
+	org, err := h.orgRepo.GetBySlug(ctx, slug)
+	if err != nil {
+		v1.RespondError(w, r, apperror.NotFound("organization not found"))
+		return
+	}
+
+	var serviceID *uuid.UUID
+	if sIDStr := r.URL.Query().Get("service_id"); sIDStr != "" {
+		if parsed, pErr := uuid.Parse(sIDStr); pErr == nil {
+			serviceID = &parsed
+		}
+	}
+
+	activeTrue := true
+	onlineTrue := true
+	filter := staff.ListStaffFilter{
+		OrganizationID: org.ID,
+		ServiceID:      serviceID,
+		IsActive:       &activeTrue,
+		AcceptsOnline:  &onlineTrue,
+	}
+
+	staffList, _, err := h.staffRepo.List(ctx, filter, 1, 100)
+	if err != nil {
+		v1.RespondError(w, r, err)
+		return
+	}
+
+	dtos := make([]PublicStaffDTO, 0, len(staffList))
+	for _, st := range staffList {
+		dtos = append(dtos, PublicStaffDTO{
+			ID:        st.ID,
+			Name:      st.FullName(),
+			Title:     st.Title,
+			Bio:       st.Bio,
+			AvatarURL: st.AvatarURL,
+		})
+	}
+
+	v1.RespondJSON(w, r, http.StatusOK, dtos)
+}
+
+// GetPublicLocations handles GET /api/v1/public/orgs/{slug}/locations
+func (h *PublicHandler) GetPublicLocations(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	slug := chi.URLParam(r, "slug")
+
+	org, err := h.orgRepo.GetBySlug(ctx, slug)
+	if err != nil {
+		v1.RespondError(w, r, apperror.NotFound("organization not found"))
+		return
+	}
+
+	locations, err := h.locationRepo.List(ctx, org.ID)
+	if err != nil {
+		v1.RespondError(w, r, err)
+		return
+	}
+
+	v1.RespondJSON(w, r, http.StatusOK, locations)
+}
+
+// GetPublicAvailability handles GET /api/v1/public/orgs/{slug}/availability
 func (h *PublicHandler) GetPublicAvailability(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	slug := chi.URLParam(r, "slug")
@@ -98,6 +256,9 @@ func (h *PublicHandler) GetPublicAvailability(w http.ResponseWriter, r *http.Req
 	}
 
 	tz := q.Get("timezone")
+	if tz == "" {
+		tz = org.Timezone
+	}
 
 	availQuery := availability.GetAvailabilityQuery{
 		OrganizationID: org.ID,
@@ -131,7 +292,7 @@ type CreateBookingRequest struct {
 	IdempotencyKey string     `json:"idempotency_key,omitempty"`
 }
 
-// CreatePublicBooking handles POST /api/v1/public/{slug}/appointments
+// CreatePublicBooking handles POST /api/v1/public/orgs/{slug}/appointments
 func (h *PublicHandler) CreatePublicBooking(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	slug := chi.URLParam(r, "slug")
@@ -167,6 +328,7 @@ func (h *PublicHandler) CreatePublicBooking(w http.ResponseWriter, r *http.Reque
 		locationID = *req.LocationID
 	}
 
+	// Server enforces organization_id, price_cents, duration, and status derived from single source of truth
 	cmd := appointment.CreateAppointmentCmd{
 		OrganizationID: org.ID,
 		ServiceID:      req.ServiceID,
@@ -177,7 +339,7 @@ func (h *PublicHandler) CreatePublicBooking(w http.ResponseWriter, r *http.Reque
 		GuestEmail:     req.CustomerEmail,
 		GuestPhone:     req.CustomerPhone,
 		Notes:          req.Notes,
-		Source:         "online",
+		Source:         "online_public",
 	}
 
 	appt, createErr := h.appointmentService.CreateAppointment(ctx, cmd)
@@ -189,9 +351,22 @@ func (h *PublicHandler) CreatePublicBooking(w http.ResponseWriter, r *http.Reque
 	v1.RespondCreated(w, r, appt)
 }
 
-// Helper registration for Chi router
+// RegisterRoutes mounts all public booking endpoints under chi router.
 func (h *PublicHandler) RegisterRoutes(r chi.Router) {
+	r.Route("/public/orgs/{slug}", func(r chi.Router) {
+		r.Get("/", h.GetPublicOrganization)
+		r.Get("/services", h.GetPublicServices)
+		r.Get("/staff", h.GetPublicStaff)
+		r.Get("/locations", h.GetPublicLocations)
+		r.Get("/availability", h.GetPublicAvailability)
+		r.Post("/appointments", h.CreatePublicBooking)
+	})
+	// Backward compatibility alias route
 	r.Route("/public/{slug}", func(r chi.Router) {
+		r.Get("/", h.GetPublicOrganization)
+		r.Get("/services", h.GetPublicServices)
+		r.Get("/staff", h.GetPublicStaff)
+		r.Get("/locations", h.GetPublicLocations)
 		r.Get("/availability", h.GetPublicAvailability)
 		r.Post("/appointments", h.CreatePublicBooking)
 	})
