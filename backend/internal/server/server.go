@@ -15,6 +15,7 @@ import (
 
 	"github.com/appointly/appointly/backend/internal/config"
 	"github.com/appointly/appointly/backend/internal/handler/v1/public"
+	"github.com/appointly/appointly/backend/internal/handler/v1/subscription"
 	"github.com/appointly/appointly/backend/internal/middleware"
 	"github.com/appointly/appointly/backend/internal/pkg/logger"
 )
@@ -29,9 +30,10 @@ type Server struct {
 // Dependencies holds all the injected dependencies for the server.
 // This struct grows as we add more handlers/use cases.
 type Dependencies struct {
-	Config        *config.Config
-	Logger        *logger.Logger
-	PublicHandler *public.PublicHandler
+	Config              *config.Config
+	Logger              *logger.Logger
+	PublicHandler       *public.PublicHandler
+	SubscriptionHandler *subscription.Handler
 }
 
 // New creates a new Server with the given dependencies.
@@ -155,11 +157,14 @@ func (s *Server) setupRoutes(r *chi.Mux, deps Dependencies) {
 			})
 		})
 
-		// Public booking API — no authentication required, rate-limited
+		// Public booking API & SaaS Subscriptions
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.PublicRateLimit(deps.Config))
 			if deps.PublicHandler != nil {
 				deps.PublicHandler.RegisterRoutes(r)
+			}
+			if deps.SubscriptionHandler != nil {
+				deps.SubscriptionHandler.RegisterRoutes(r)
 			}
 		})
 	})
