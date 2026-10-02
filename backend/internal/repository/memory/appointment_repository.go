@@ -92,7 +92,7 @@ func (r *AppointmentRepository) GetByID(ctx context.Context, orgID, appointmentI
 	defer r.mu.RUnlock()
 
 	appt, exists := r.appointments[appointmentID]
-	if !exists || appt.OrganizationID != orgID {
+	if !exists || (orgID != uuid.Nil && appt.OrganizationID != orgID) {
 		return nil, apperror.NotFound("appointment")
 	}
 
@@ -134,7 +134,7 @@ func (r *AppointmentRepository) List(ctx context.Context, filter appointment.Lis
 		if filter.DateFrom != nil && a.StartTime.Before(*filter.DateFrom) {
 			continue
 		}
-		if filter.DateTo != nil && a.EndTime.After(*filter.DateTo) {
+		if filter.DateTo != nil && a.StartTime.After(*filter.DateTo) {
 			continue
 		}
 

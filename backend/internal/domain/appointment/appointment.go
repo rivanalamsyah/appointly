@@ -28,7 +28,7 @@ const (
 var ValidTransitions = map[Status][]Status{
 	StatusPending:     {StatusConfirmed, StatusCancelled},
 	StatusConfirmed:   {StatusRescheduled, StatusCompleted, StatusCancelled, StatusNoShow},
-	StatusRescheduled: {StatusConfirmed, StatusCancelled},
+	StatusRescheduled: {StatusConfirmed, StatusCompleted, StatusCancelled, StatusNoShow},
 	StatusCompleted:   {}, // terminal state
 	StatusCancelled:   {}, // terminal state
 	StatusNoShow:      {}, // terminal state
