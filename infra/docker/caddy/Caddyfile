@@ -1,0 +1,54 @@
+# ==============================================================================
+# Appointly Production Reverse Proxy Configuration (Caddy)
+# ==============================================================================
+
+{
+	email admin@appointly.com
+	auto_https disable_redirects
+}
+
+# HTTP / HTTPS Frontend & API Router
+:80 {
+	# Compress response payloads
+	encode gzip zstd
+
+	# Global Security Headers
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		X-XSS-Protection "1; mode=block"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	# API v1 & Health Check Reverse Proxy
+	handle /api/* {
+		reverse_proxy backend:8080 {
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+		}
+	}
+
+	handle /healthz {
+		reverse_proxy backend:8080
+	}
+
+	handle /livez {
+		reverse_proxy backend:8080
+	}
+
+	handle /readyz {
+		reverse_proxy backend:8080
+	}
+
+	# Frontend Astro Application
+	handle {
+		reverse_proxy frontend:4321 {
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+		}
+	}
+}

@@ -116,9 +116,12 @@ func (s *Server) setupMiddleware(r *chi.Mux, deps Dependencies) {
 
 // setupRoutes wires all HTTP routes.
 func (s *Server) setupRoutes(r *chi.Mux, deps Dependencies) {
-	// Health and readiness endpoints (no auth, no rate-limiting)
+	// Health, liveness, and readiness endpoints (no auth, no rate-limiting)
 	r.Get("/health", s.handleHealth)
+	r.Get("/healthz", s.handleHealth)
+	r.Get("/livez", s.handleHealth)
 	r.Get("/ready", s.handleReady)
+	r.Get("/readyz", s.handleReady)
 
 	// API v1 — authenticated routes
 	r.Route("/api/v1", func(r chi.Router) {

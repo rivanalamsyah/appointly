@@ -1,0 +1,145 @@
+name: Appointly CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  backend-ci:
+    name: Backend CI (Go)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: appointly_test
+          POSTGRES_USER: appointly
+          POSTGRES_PASSWORD: secret_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+          cache-dependency-path: backend/go.sum
+
+      - name: Verify Formatting
+        run: |
+          cd backend
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "Go code is not formatted properly:"
+            gofmt -l .
+            exit 1
+          fi
+
+      - name: Run Unit & Integration Tests
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: appointly
+          DB_PASSWORD: secret_password
+          DB_NAME: appointly_test
+          DB_SSLMODE: disable
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          JWT_SECRET: test_jwt_secret_32_bytes_min_length_required_prod
+        run: |
+          cd backend
+          go test -v -race ./...
+
+      - name: Build Backend Binary
+        run: |
+          cd backend
+          CGO_ENABLED=0 go build -o /dev/null ./cmd/api
+
+      - name: Build Backend Docker Image
+        run: |
+          docker build -t appointly-backend:ci ./backend
+
+  frontend-ci:
+    name: Frontend CI (Astro & React)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: TypeScript Typecheck
+        run: |
+          cd frontend
+          npx tsc --noEmit
+
+      - name: Build Frontend Application
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Build Frontend Docker Image
+        run: |
+          docker build -t appointly-frontend:ci ./frontend
+
+  migration-validation:
+    name: Migration Validation
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: appointly_mig_test
+          POSTGRES_USER: appointly
+          POSTGRES_PASSWORD: secret_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Run golang-migrate validation
+        run: |
+          docker run --net=host -v $(pwd)/backend/db/migrations:/migrations migrate/migrate:v4.17.0 \
+            -path=/migrations \
+            -database="postgres://appointly:secret_password@localhost:5432/appointly_mig_test?sslmode=disable" \
+            up
