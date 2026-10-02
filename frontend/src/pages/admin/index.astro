@@ -1,0 +1,13 @@
+---
+/**
+ * Platform Super Admin Dashboard Page
+ */
+import DashboardLayout from '@/components/layout/DashboardLayout.astro';
+import SuperAdminDashboard from '@/components/features/admin/SuperAdminDashboard';
+---
+
+<DashboardLayout title="Platform Super Admin Control Plane">
+  <div class="space-y-6">
+    <SuperAdminDashboard client:load />
+  </div>
+</DashboardLayout>

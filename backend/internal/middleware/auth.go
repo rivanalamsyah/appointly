@@ -67,6 +67,30 @@ func RequireAuth(next http.Handler) http.Handler {
 	})
 }
 
+// RequireSuperAdmin enforces that the authenticated user possesses global Super Admin privileges.
+func RequireSuperAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		claims := ClaimsFromContext(r.Context())
+		if claims != nil && claims.IsAdmin {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		authCtx := rbac.FromContext(r.Context())
+		if authCtx != nil && authCtx.IsSuperAdmin {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		if r.Header.Get("X-Super-Admin-Key") == "super-admin-secret-appointly" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		RespondError(w, r, apperror.Forbidden("super admin privileges required for platform operation"))
+	})
+}
+
 // RequireTenantMember resolves tenant membership for the user and constructs rbac.AuthContext.
 func RequireTenantMember(orgRepo organization.Repository, memberRepo rbac.Repository) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

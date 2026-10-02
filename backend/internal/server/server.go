@@ -14,6 +14,7 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 
 	"github.com/appointly/appointly/backend/internal/config"
+	"github.com/appointly/appointly/backend/internal/handler/v1/admin"
 	"github.com/appointly/appointly/backend/internal/handler/v1/audit"
 	"github.com/appointly/appointly/backend/internal/handler/v1/integration"
 	"github.com/appointly/appointly/backend/internal/handler/v1/public"
@@ -38,6 +39,7 @@ type Dependencies struct {
 	SubscriptionHandler *subscription.Handler
 	AuditHandler        *audit.Handler
 	IntegrationHandler  *integration.Handler
+	AdminHandler        *admin.Handler
 }
 
 // New creates a new Server with the given dependencies.
@@ -177,6 +179,11 @@ func (s *Server) setupRoutes(r *chi.Mux, deps Dependencies) {
 			// External Integrations & Webhooks
 			if deps.IntegrationHandler != nil {
 				deps.IntegrationHandler.RegisterRoutes(r)
+			}
+
+			// Platform Super Admin
+			if deps.AdminHandler != nil {
+				deps.AdminHandler.RegisterRoutes(r)
 			}
 		})
 
