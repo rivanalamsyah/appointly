@@ -160,8 +160,8 @@ export default function CustomersManager() {
     setFormEmail(c.email || '');
     setFormPhone(c.phone || '');
     setFormNotes(c.notes || '');
-    setFormStatus(c.status);
-    setFormSource(c.source);
+    setFormStatus(c.status || 'ACTIVE');
+    setFormSource(c.source || 'MANUAL');
     setFormError(null);
     setIsFormOpen(true);
   };
@@ -425,7 +425,7 @@ export default function CustomersManager() {
                         </p>
                       </div>
                     </div>
-                    {getStatusBadge(c.status)}
+                    {getStatusBadge(c.status || 'ACTIVE')}
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-[11px] text-[var(--color-text-muted)] pt-3 border-t border-[var(--color-surface-border)]">
@@ -467,7 +467,7 @@ export default function CustomersManager() {
                     <h2 className="text-lg font-bold text-white font-[var(--font-display)]">
                       {selectedCustomer.first_name} {selectedCustomer.last_name}
                     </h2>
-                    {getStatusBadge(selectedCustomer.status)}
+                    {getStatusBadge(selectedCustomer.status || 'ACTIVE')}
                   </div>
                   <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
                     Customer ID: <code className="text-indigo-300 font-mono text-[10px]">{selectedCustomer.id}</code>

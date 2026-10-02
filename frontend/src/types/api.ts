@@ -22,6 +22,8 @@ export interface ResponseMeta {
 export interface ApiResponse<T> {
   data: T;
   meta: ResponseMeta;
+  success?: boolean;
+  error?: ApiErrorBody;
 }
 
 export interface ApiListResponse<T> {
@@ -117,6 +119,7 @@ export interface Staff {
   user_id?: string;
   first_name: string;
   last_name: string;
+  name?: string;
   email?: string;
   phone?: string;
   avatar_url?: string;
@@ -144,23 +147,30 @@ export interface ServiceCategory {
 
 export interface Service {
   id: string;
-  organization_id: string;
+  organization_id?: string;
+  tenant_id?: string;
   category_id?: string;
   category?: ServiceCategory;
   name: string;
+  slug?: string;
   description?: string;
-  status: 'active' | 'inactive' | 'archived';
+  status?: 'active' | 'inactive' | 'archived';
+  is_active?: boolean;
   duration_minutes: number;
-  buffer_before_minutes: number;
-  buffer_after_minutes: number;
+  buffer_before_minutes?: number;
+  buffer_after_minutes?: number;
+  buffer_time_before_minutes?: number;
+  buffer_time_after_minutes?: number;
   price_cents: number;
   currency: string;
-  max_capacity: number;
-  requires_resource: boolean;
+  requires_deposit?: boolean;
+  deposit_amount_cents?: number;
+  max_capacity?: number;
+  requires_resource?: boolean;
   color?: string;
   image_url?: string;
-  display_order: number;
-  is_public: boolean;
+  display_order?: number;
+  is_public?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -182,7 +192,8 @@ export interface Location {
   latitude?: number;
   longitude?: number;
   timezone?: string;
-  status: 'active' | 'inactive';
+  status?: 'active' | 'inactive';
+  is_active?: boolean;
   is_default: boolean;
   display_order: number;
   created_at: string;
@@ -190,6 +201,9 @@ export interface Location {
 }
 
 // Customer
+export type CustomerStatus = 'active' | 'inactive' | 'vip' | 'blocked' | 'ACTIVE' | 'INACTIVE' | 'VIP' | 'BLOCKED';
+export type CustomerSource = 'online' | 'manual' | 'import' | 'referral' | 'ONLINE_BOOKING' | 'WALK_IN' | 'MANUAL';
+
 export interface Customer {
   id: string;
   organization_id: string;
@@ -199,6 +213,8 @@ export interface Customer {
   email?: string;
   phone?: string;
   notes?: string;
+  status?: CustomerStatus;
+  source?: CustomerSource;
   total_appointments: number;
   completed_appointments: number;
   no_show_count: number;
@@ -215,11 +231,19 @@ export type AppointmentStatus =
   | 'rescheduled'
   | 'completed'
   | 'cancelled'
-  | 'no_show';
+  | 'no_show'
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'RESCHEDULED'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'NO_SHOW'
+  | 'PENDING_DEPOSIT';
 
 export interface Appointment {
   id: string;
-  organization_id: string;
+  organization_id?: string;
+  tenant_id?: string;
   location_id: string;
   service_id: string;
   staff_id: string;
@@ -237,9 +261,9 @@ export interface Appointment {
   notes?: string;
   internal_notes?: string;
   cancel_reason?: string;
-  source: 'online' | 'manual' | 'api';
+  source: 'online' | 'manual' | 'api' | 'ONLINE_BOOKING';
   payment_id?: string;
-  created_by: string;
+  created_by?: string;
   created_at: string;
   updated_at: string;
   // Joined fields (returned by API with full details)
@@ -388,4 +412,38 @@ export interface UpdateResourceRequest {
   status: ResourceStatus;
   description?: string;
 }
+
+export interface Refund {
+  id: string;
+  payment_id: string;
+  amount_cents: number;
+  currency: string;
+  reason?: string;
+  status: 'pending' | 'succeeded' | 'failed';
+  created_at: string;
+}
+
+export interface BusinessHours {
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  is_closed: boolean;
+}
+
+export interface StaffSchedule {
+  id: string;
+  staff_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+}
+
+export interface StaffTimeOff {
+  id: string;
+  staff_id: string;
+  start_at: string;
+  end_at: string;
+  reason?: string;
+}
+
 
