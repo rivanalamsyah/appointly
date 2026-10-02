@@ -1,138 +1,177 @@
-# Appointly
+# 📅 Appointly — Multi-Tenant Appointment & Booking SaaS Platform
 
-> **Production-ready multi-tenant SaaS** for appointment and online booking management.  
-> Initial vertical: Salon/Barbershop — architecture is vertical-agnostic.
+> **Platform Manajemen Janji Temu & Pemesanan Online Multi-Tenant Tingkat Produksi (Production-Ready).**  
+> *Arsitektur dirancang secara **Agnostik Vertikal** — mendukung Salon, Klinik, Konsultan, Hukum, Pelatih, hingga Lembaga Kursus tanpa perlu mengubah struktur skema basis data utama atau mesin pemesanan.*
 
 ---
 
-## Quick Start
+## 📑 Daftar Isi
 
-### Prerequisites
-- Go 1.26+
-- Node 20+
-- Docker & Docker Compose
+- [Fitur Utama](#-fitur-utama)
+- [Arsitektur Teknis](#-arsitektur-teknis)
+- [Persyaratan Sistem](#-persyaratan-sistem)
+- [Panduan Memulai Cepat (Quick Start)](#-panduan-memulai-cepat-quick-start)
+- [Perintah Makefile](#-perintah-makefile)
+- [Struktur Proyek](#-struktur-proyek)
+- [Variabel Lingkungan (Environment Variables)](#-variabel-lingkungan-environment-variables)
+- [Modul Domain Aplikasi](#-modul-domain-aplikasi)
+- [Keamanan & Isolasi Tenant](#-keamanan--isolasi-tenant)
+- [Panduan Kontribusi](#-panduan-kontribusi)
+- [Lisensi](#-lisensi)
 
-### Local Development
+---
 
+## 🌟 Fitur Utama
+
+- **Isolasi Multi-Tenant Ketat**: Setiap entitas bisnis dipisahkan berdasarkan `organization_id` pada tingkat query basis data dan konteks server.
+- **Pencegahan Double-Booking**: Penguncian baris eksplisit (`SELECT FOR UPDATE`) dan Indeks Unik Parsial PostgreSQL menjamin tidak ada konflik pemesanan slot waktu secara bersamaan.
+- **Mesin Ketersediaan Dinamis (Dynamic Availability Engine)**: Menghitung slot waktu secara *real-time* berdasarkan jam operasional lokasi, jadwal staf, jeda layanan (*buffer times*), serta ketersediaan sumber daya.
+- **Pemisahan Pembayaran**: Membedakan transaksi pembayaran janji temu pelanggan (B2C) dengan pembayaran langganan SaaS organisasi (B2B).
+- **Alur Pemesanan Publik Mobile-First**: Antarmuka pemesanan untuk pelanggan publik yang responsif, intuitif, dan bebas dari pengalihan perhatian.
+- **Sistem Audit Log Imutabel**: Catatan jejak audit yang tidak dapat diubah (*append-only*) untuk mendokumentasikan setiap aksi penting pengguna dan sistem.
+- **Notifikasi & Pekerja Latar Belakang (Background Workers)**: Pengiriman email, SMS/WhatsApp, dan webhook secara asinkron dengan penanganan ulang (*retry*) eksponensial.
+
+---
+
+## 🛠️ Arsitektur Teknis
+
+| Komponen | Teknologi | Keterangan |
+| :--- | :--- | :--- |
+| **Backend Service** | Go 1.26+, Chi Router | RESTful JSON API berkinerja tinggi |
+| **Database Utama** | PostgreSQL 16 | ACID-compliant, JSONB, Indeks Unik Parsial |
+| **Penyimpanan Kode SQL** | `sqlc` + raw SQL | Query aman tipe (*type-safe*) tanpa keajaiban ORM |
+| **Cache & Queue** | Redis 7 | Sesi, pembatas laju (*rate limiting*), dan antrean kerja |
+| **Frontend Platform** | Astro 5 + React 19 Islands | Rendering secepat kilat dengan hidrasi parsial |
+| **Sistem Desain UI** | Tailwind CSS v4 | Token visual terpusat & komponen terkonfigurasi |
+| **State Server UI** | TanStack Query v5 | Cache otomatis, pembaruan di latar belakang |
+| **Penyimpanan Objek** | MinIO / AWS S3 | Penyimpanan berkas media & gambar profil |
+
+---
+
+## 💻 Persyaratan Sistem
+
+Pastikan perangkat lunak berikut telah terinstal pada lingkungan pengembangan Anda:
+
+- **Go**: v1.26 atau lebih baru
+- **Node.js**: v20.0.0 atau lebih baru (npm v10+)
+- **Docker**: Engine v24+ & Docker Compose v2.20+
+- **Make**: (Opsional) untuk menjalankan perintah pintas
+
+---
+
+## 🚀 Panduan Memulai Cepat (Quick Start)
+
+### 1. Salin Konfigurasi Lingkungan
 ```bash
-# 1. Copy environment variables
 cp .env.example .env
-
-# 2. Start infrastructure (PostgreSQL, Redis, MinIO)
-make infra-up
-
-# 3. Run database migrations
-make migrate-up
-
-# 4. Start backend API server (with live reload)
-make dev-api
-
-# 5. Start frontend dev server (in separate terminal)
-make dev-frontend
-
-# 6. Open app
-# Frontend:  http://localhost:4321
-# API:       http://localhost:8080
-# API Docs:  http://localhost:8080/docs
-# MinIO:     http://localhost:9001  (admin/minioadmin)
 ```
 
-### Available Make Targets
-
+### 2. Jalankan Infrastruktur Layanan (Docker)
 ```bash
-make help              # Show all targets
-make infra-up          # Start Docker infrastructure
-make infra-down        # Stop Docker infrastructure
-make migrate-up        # Run pending migrations
-make migrate-down      # Rollback last migration
-make migrate-create    # Create new migration (NAME=xxx)
-make sqlc-gen          # Regenerate sqlc query code
-make dev-api           # Run API server with live reload
-make dev-worker        # Run background worker with live reload
-make dev-frontend      # Run Astro dev server
-make test-unit         # Run unit tests
-make test-integration  # Run integration tests (requires infra)
-make test-all          # Run all tests
-make lint              # Run golangci-lint + eslint
-make fmt               # Format all code
-make build-api         # Build production API binary
-make build-frontend    # Build production frontend
-make build-all         # Build everything
-make openapi-gen       # Generate OpenAPI spec
+make infra-up
 ```
+*Perintah ini akan menjalankan kontainer PostgreSQL 16, Redis 7, dan MinIO.*
+
+### 3. Jalankan Migrasi Basis Data
+```bash
+make migrate-up
+```
+
+### 4. Jalankan Server API Backend
+```bash
+make dev-api
+```
+
+### 5. Jalankan Frontend Astro (pada terminal terpisah)
+```bash
+make dev-frontend
+```
+
+### 6. Akses Layanan Aplikasi
+- **Frontend Web**: [http://localhost:4321](http://localhost:4321)
+- **API Backend**: [http://localhost:8080](http://localhost:8080)
+- **Spesifikasi API Docs**: [http://localhost:8080/docs](http://localhost:8080/docs)
+- **Konsol MinIO**: [http://localhost:9001](http://localhost:9001) *(Kredensial: admin / minioadmin)*
 
 ---
 
-## Architecture
+## 📋 Perintah Makefile
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for full architecture decisions, domain model, API design, and security architecture.
-
-### Tech Stack Summary
-
-| Layer | Technology |
-|---|---|
-| Backend | Go 1.26, Chi, sqlc, PostgreSQL 16, Redis 7 |
-| Frontend | Astro 5, React 19, Tailwind CSS 4, TanStack Query |
-| Background Jobs | River (Postgres-backed) |
-| Auth | JWT (access) + Opaque refresh tokens |
-| Storage | MinIO (dev) / S3 (prod) |
-| Container | Docker + Compose |
+| Target Command | Deskripsi Perintah |
+| :--- | :--- |
+| `make help` | Menampilkan seluruh daftar perintah Makefile yang tersedia |
+| `make infra-up` | Menjalankan kontainer infrastruktur pendukung (Postgres, Redis, MinIO) |
+| `make infra-down` | Menghentikan dan menghapus kontainer infrastruktur |
+| `make migrate-up` | Menjalankan seluruh migrasi skema basis data |
+| `make migrate-down` | Membatalkan (*rollback*) migrasi skema basis data terakhir |
+| `make sqlc-gen` | Menggenerate ulang kode Go type-safe dari berkas SQL |
+| `make dev-api` | Menjalankan server API backend dengan *live reload* |
+| `make dev-worker` | Menjalankan pekerja latar belakang (*worker*) |
+| `make dev-frontend` | Menjalankan server pengembangan Astro frontend |
+| `make test-unit` | Menjalankan pengujian unit (*unit tests*) |
+| `make test-all` | Menjalankan seluruh pengujian (unit, integrasi, dan konkurensi) |
+| `make lint` | Menjalankan analisis statis (*golangci-lint* & *eslint*) |
+| `make fmt` | Memformat seluruh berkas kode sumber |
+| `make build-all` | Membangun biner produksi API backend dan aset frontend |
 
 ---
 
-## Project Structure
+## 📁 Struktur Proyek
 
-```
+```text
 appointly/
-├── backend/          # Go API service + background worker
-├── frontend/         # Astro + React frontend
-├── infra/            # Docker, Nginx configs
-├── docker-compose.yml
-├── Makefile
-├── .env.example
-├── README.md
-└── ARCHITECTURE.md
+├── backend/                  # Layanan API Go & Pengolah Pekerjaan Latar Belakang
+│   ├── cmd/                  # Titik masuk biner (api & worker)
+│   ├── internal/             # Logika aplikasi internal terisolasi
+│   │   ├── config/           # Pemuat konfigurasi lingkungan
+│   │   ├── domain/           # Entitas & antarmuka domain murni
+│   │   ├── handler/          # Pengendali transport HTTP (REST API v1)
+│   │   ├── infrastructure/   # Adaptor sistem eksternal (Payment, Mail, Calendar)
+│   │   ├── middleware/       # Middleware HTTP (Auth, Tenant, Security, Rate Limit)
+│   │   ├── repository/       # Implementasi repositori basis data (Postgres & Redis)
+│   │   ├── usecase/          # Logika bisnis & pengorkestrasian aplikasi
+│   │   └── worker/           # Pengolah pekerjaan antrean asinkron
+│   └── db/                   # Skema migrasi SQL & kueri sqlc
+├── frontend/                 # Aplikasi Frontend Astro + React Islands
+│   ├── src/
+│   │   ├── components/       # Komponen UI terpakai & fitur modul
+│   │   ├── layout/           # Shell aplikasi, Sidebar, Topbar, Drawer
+│   │   ├── pages/            # Rute halaman Astro (Dashboard & Booking Publik)
+│   │   ├── styles/           # Token desain global & Tailwind CSS
+│   │   └── types/            # Definisi tipe TypeScript API
+├── infra/                    # Konfigurasi Docker & Reverse Proxy (Caddy/Nginx)
+├── docker-compose.yml        # Konfigurasi pengorkestrasian kontainer lokal
+├── Makefile                  # Otomatisasi Perintah Pengembang
+├── ARCHITECTURE.md           # Dokumentasi Arsitektur Mendalam
+├── DEPLOYMENT.md             # Panduan Operasional & Peluncuran Produksi
+└── SECURITY.md               # Model & Kebijakan Keamanan Sistem
 ```
 
 ---
 
-## Environment Variables
+## 🔒 Keamanan & Isolasi Tenant
 
-See [.env.example](./.env.example) for all required and optional environment variables with descriptions.
+Aplikasi Appointly mengimplementasikan pendekatan **Defense-in-Depth** untuk menjamin isolasi data antar organisasi:
+- Konteks `organization_id` diekstrak secara otomatis di tingkat server melalui token JWT terenkripsi.
+- Setiap kueri basis data pada repositori memuat batasan eksplisit `WHERE organization_id = $1`.
+- Pengujian isolasi lintas-tenant (*cross-tenant tests*) dijalankan secara otomatis pada pipeline CI/CD untuk memastikan tidak ada kebocoran data antar organisasi.
 
----
-
-## Domain Modules
-
-| Module | Description |
-|---|---|
-| Auth | User registration, login, token refresh, logout |
-| Organization | Tenant management, settings, onboarding |
-| Member & RBAC | Team members, roles, permissions |
-| Location | Physical locations / branches |
-| Staff | Staff profiles, schedules, time-off |
-| Service | Services, categories, pricing, duration |
-| Resource | Bookable resources (rooms, chairs, equipment) |
-| Customer | Customer profiles, history |
-| Availability | Slot calculation engine |
-| Appointment | Booking lifecycle management |
-| Payment | Payment processing, refunds |
-| Notification | Email, WhatsApp, in-app, webhook |
-| Subscription | Plans, billing, usage limits |
-| Audit Log | Immutable audit trail |
+Dokumentasi keamanan lengkap dapat dilihat pada [SECURITY.md](./SECURITY.md).
 
 ---
 
-## Contributing
+## 🤝 Panduan Kontribusi
 
-1. Branch from `main`: `git checkout -b feat/your-feature`
-2. Follow the coding standards in [ARCHITECTURE.md](./ARCHITECTURE.md)
-3. Write tests for new business logic
-4. Run `make lint fmt test-unit` before committing
-5. Open a PR with clear description of changes
+1. Buat cabang fitur baru dari `main`:  
+   `git checkout -b feat/nama-fitur-anda`
+2. Patuhi standar penulisan kode sesuai petunjuk pada [ARCHITECTURE.md](./ARCHITECTURE.md).
+3. Tulis pengujian unit (*unit test*) untuk setiap logika bisnis baru.
+4. Jalankan perintah verifikasi sebelum melakukan commit:  
+   `make lint fmt test-unit`
+5. Buat *Pull Request* (PR) dengan deskripsi perubahan yang jelas dan terstruktur.
 
 ---
 
-## License
+## 📄 Lisensi
 
-Proprietary — All Rights Reserved.
+**Proprietary & Confidential** — Hak Cipta Dilindungi Undang-Undang.

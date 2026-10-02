@@ -1,43 +1,78 @@
-# Astro Starter Kit: Minimal
+# 🎨 Appointly — Dokumentasi Frontend Platform
 
-```sh
-npm create astro@latest -- --template minimal
-```
+> **Aplikasi Frontend Berbasis Astro 5 + TypeScript + React 19 Islands + Tailwind CSS v4.**  
+> Dirancang dengan standar antarmuka B2B SaaS modern, responsif *mobile-first*, mematuhi standar aksesibilitas WCAG AA, dan siap pakai untuk produksi.
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+---
 
-## 🚀 Project Structure
+## 📑 Daftar Isi
 
-Inside of your Astro project, you'll see the following folders and files:
+- [Arsitektur & Komponen](#-arsitektur--komponen)
+- [Struktur Direktori Frontend](#-struktur-direktori-frontend)
+- [Perintah Pengembangan (CLI Commands)](#-perintah-pengembangan-cli-commands)
+- [Sistem Desain & Token Visual](#-sistem-desain--token-visual)
+- [Integrasi API & State Server](#-integrasi-api--state-server)
+
+---
+
+## 🏗️ Arsitektur & Komponen
+
+Frontend Appointly mengadopsi **Astro Islands Architecture**:
+- **Output Statis & SSR**: Halaman utama, pemasaran, dan shell dashboard di-render sebagai HTML super cepat.
+- **Hidrasi Parsial React**: React 19 Islands hanya digunakan pada komponen interaktif yang kompleks seperti Mesin Pemesanan Publik (*Booking Wizard*), Kalender Interaktif, Pengelola Layanan, dan Modal Konfirmasi.
+
+---
+
+## 📂 Struktur Direktori Frontend
 
 ```text
-/
-├── public/
+frontend/
 ├── src/
-│   └── pages/
-│       └── index.astro
-└── package.json
+│   ├── components/
+│   │   ├── layout/       # Shell aplikasi, Sidebar responsif, Topbar, Drawer
+│   │   ├── ui/           # Komponen primitif terpakai (Button, Modal, Table, Switch, Tooltip)
+│   │   ├── features/     # Komponen fitur modul domain (Appointments, Calendar, Services, Staff)
+│   │   └── marketing/    # Komponen halaman utama pemasaran
+│   ├── lib/              # Api Client (ky), TanStack Query Client, Utilities
+│   ├── pages/            # Rute Halaman Astro
+│   │   ├── dashboard/    # Dashboard Admin Organisasi (Terautentikasi)
+│   │   ├── book/[slug]/  # Portal Pemesanan Pelanggan Publik
+│   │   └── index.astro   # Landing Page Pemasaran
+│   ├── styles/           # Token Desain Global & Custom CSS Variables
+│   └── types/            # Definisi Tipe TypeScript API & Domain
+├── astro.config.mjs      # Konfigurasi Astro (Adapter Node & Integrasi React)
+├── tailwind.config.mjs   # Konfigurasi Tailwind CSS v4
+├── tsconfig.json         # Konfigurasi TypeScript
+└── package.json          # Dependensi & Naskah Perintah
 ```
 
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
+---
 
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
+## 💻 Perintah Pengembangan (CLI Commands)
 
-Any static assets, like images, can be placed in the `public/` directory.
+Seluruh perintah dijalankan dari folder `frontend/`:
 
-## 🧞 Commands
+| Perintah | Deskripsi Tindakan |
+| :--- | :--- |
+| `npm install` | Menginstal seluruh dependensi paket frontend |
+| `npm run dev` | Menjalankan server pengembangan lokal di `http://localhost:4321` |
+| `npm run build` | Kompilasi build produksi ke folder `./dist/` |
+| `npm run preview` | Pratinjau hasil build produksi secara lokal |
+| `npm run typecheck` | Menjalankan verifikasi tipe TypeScript (`tsc --noEmit`) |
+| `npm run lint` | Menjalankan analisis kualitas kode dengan ESLint |
 
-All commands are run from the root of the project, from a terminal:
+---
 
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
+## 🎨 Sistem Desain & Token Visual
 
-## 👀 Want to learn more?
+Token desain dikelola secara terpusat pada [`src/styles/global.css`](file:///d:/appointly/frontend/src/styles/global.css) menggunakan variabel CSS:
+- **Tipografi**: Display Font (`Outfit`), Body Font (`Inter`), Monospace (`JetBrains Mono`).
+- **Palet Warna**: Mode gelap default (`#0f0f13` base, `#16161d` raised cards) dengan gradien Indigo/Violet.
+- **Aksesibilitas**: Kontras warna memenuhi standar WCAG AA dan dilengkapi indikator fokus keyboard yang jelas.
 
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+---
+
+## 🔗 Integrasi API & State Server
+
+- **API Client**: Menggunakan `ky` fetch wrapper terkonfigurasi di `src/lib/api-client.ts` yang menginjeksi token autentikasi JWT dan header tenant secara otomatis.
+- **State Server**: Menggunakan `TanStack Query v5` di `src/lib/query-client.ts` untuk pembaruan data otomatis, caching, dan penanganan status *loading/error/empty*.

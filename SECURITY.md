@@ -1,59 +1,77 @@
-# Security Model & Architecture — Appointly
+# 🛡️ Kebijakan & Arsitektur Keamanan Sistem (Security Model) — Appointly
 
-Appointly is designed with a **defense-in-depth, zero-trust multi-tenant security architecture**. Every component — from HTTP entry points down to database queries — enforces strict tenant isolation, authorization context verification, and audit trail immutability.
-
----
-
-## 🛡️ Core Security Architecture & Threat Assumptions
-
-### 1. Multi-Tenant Data Isolation Strategy
-- **Row-Level Organization Scoping**: All domain repositories (`Appointment`, `Staff`, `Customer`, `Service`, `Location`, `Resource`, `Payment`, `Subscription`, `AuditLog`) require an explicit `organization_id` context parameter.
-- **Cross-Tenant Access Rejection**: Authorization logic evaluates `authCtx.OrgID == target.OrganizationID`. Any cross-tenant attempt returns `403 Forbidden` or `404 Not Found` without disclosing the existence of another tenant's resource.
-- **Systematic Verification**: Verified via automated test suite in [`cross_tenant_test.go`](file:///d:/appointly/backend/internal/usecase/security/cross_tenant_test.go).
-
-### 2. Separation of Payment Domains
-- **B2C Customer Appointment Payments**: Processed through client payment provider abstractions (e.g. Midtrans, Stripe, Cash/Pay-later).
-- **B2B SaaS Subscription Payments**: Handled separately via tenant platform billing subscriptions (`Plan`, `Subscription`, `UsageRecords`).
-- **Isolation Guarantee**: Client booking payments can never alter or influence tenant SaaS subscription states or vice-versa.
+> Dokumentasi resmi mengenai arsitektur keamanan, isolasi multi-tenant, otorisasi RBAC, perlindungan data sensitif, serta pertahanan jaringan aplikasi **Appointly**.
 
 ---
 
-## 🔒 Authentication & Authorization (RBAC)
+## 📑 Daftar Isi
 
-### 1. User Identity & Membership Separation
-- **Identity Users**: System accounts holding credentials, email, password hashes, and MFA state.
-- **Organization Memberships**: Connects a User to an Organization with a specific Role (`Owner`, `Admin`, `Staff`, `Member`).
-- **Staff Profiles**: Operational scheduling profiles linked to an organization. A staff profile can exist without a system login account.
+- [1. Prinsip Keamanan & Ancaman](#1-prinsip-keamanan--ancaman)
+- [2. Strategi Isolasi Data Multi-Tenant](#2-strategi-isolasi-data-multi-tenant)
+- [3. Pemisahan Domain Pembayaran](#3-pemisahan-domain-pembayaran)
+- [4. Autentikasi & Hirarki RBAC](#4-autentikasi--hirarki-rbac)
+- [5. Sistem Audit Log Imutabel](#5-sistem-audit-log-imutabel)
+- [6. Pertahanan Jaringan & Header HTTP](#6-pertahanan-jaringan--header-http)
+- [7. Pembatas Laju API (Rate Limiting)](#7-pembatas-laju-api-rate-limiting)
+- [8. Keamanan Webhook & Idempotensi](#8-keamanan-webhook--idempotensi)
+- [9. Enkripsi & Pelindungan Data Sensitif](#9-enkripsi--pelindungan-data-sensitif)
+- [10. Pelaporan Kerentanan Keamanan](#10-pelaporan-kerentanan-keamanan)
 
-### 2. RBAC Permission Matrix
-| Role | Manage Business & Settings | Manage Staff & Services | View All Appointments | Perform Booking & Reschedule | View Financials & Billing | View Immutable Audit Logs |
+---
+
+## 1. Prinsip Keamanan & Ancaman
+
+Appointly menggunakan arsitektur **Defense-in-Depth (Pertahanan Berlapis)** dan prinsip **Zero-Trust Multi-Tenant Architecture**. Setiap lapisan sistem — mulai dari endpoint HTTP publik hingga kueri basis data paling dasar — memverifikasi konteks tenant, autentikasi sesi, dan integritas jejak audit.
+
+---
+
+## 2. Strategi Isolasi Data Multi-Tenant
+
+- **Konteks Tenant Wajib (`organization_id`)**: Seluruh repositori domain (`Appointment`, `Staff`, `Customer`, `Service`, `Location`, `Resource`, `Payment`, `Subscription`, `AuditLog`) membutuhkan parameter `organization_id` yang terverifikasi.
+- **Penolakan Akses Lintas-Tenant (Cross-Tenant Rejection)**: Logika otorisasi mengevaluasi `authCtx.OrgID == target.OrganizationID`. Setiap ancaman atau upaya akses lintas-tenant mengembalikan respons `403 Forbidden` atau `404 Not Found` tanpa membocorkan keberadaan sumber daya milik organisasi lain.
+- **Pengujian Terotomatisasi**: Diverifikasi secara otomatis melalui suite tes keamanan pada `internal/usecase/security/cross_tenant_test.go`.
+
+---
+
+## 3. Pemisahan Domain Pembayaran
+
+- **Pembayaran Janji Temu Pelanggan (B2C)**: Diproses melalui abstraksi provider pembayaran terverifikasi (Stripe, Midtrans, Pembayaran di Tempat).
+- **Pembayaran Langganan SaaS Organisasi (B2B)**: Dikelola secara terpisah melalui modul billing langganan platform tenant (`Plan`, `Subscription`, `UsageRecords`).
+- **Jaminan Keamanan**: Transaksi pembayaran pelanggan publik tidak akan pernah dapat mengubah atau mempengaruhi status langganan SaaS organisasi penyedia jasa.
+
+---
+
+## 4. Autentikasi & Hirarki RBAC
+
+### Pemisahan Identitas & Keanggotaan Organisasi
+- **User Account**: Akun pengguna sistem yang menyimpan kredensial login, email, hash kata sandi, dan status sesi.
+- **Organization Membership**: Menghubungkan pengguna ke Organisasi dengan Peran tertentu (`Owner`, `Admin`, `Staff`, `Member`).
+- **Staff Profile**: Profil operasional staf untuk penjadwalan. Profil staf dapat berdiri sendiri tanpa harus memiliki akun login sistem.
+
+### Matriks Izin Akses RBAC
+
+| Peran (Role) | Kelola Bisnis & Settings | Kelola Staf & Layanan | Lihat Semua Booking | Eksekusi Booking & Reschedule | Lihat Keuangan & Billing | Lihat Audit Log Imutabel |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Owner** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Admin** | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Staff** | ❌ | ❌ | Assigned Only / Configurable | ✅ | ❌ | ❌ |
-| **Member** | ❌ | ❌ | Self Only | ✅ | ❌ | ❌ |
+| **Staff** | ❌ | ❌ | Hanya Ditugaskan / Konfigurasi | ✅ | ❌ | ❌ |
+| **Member** | ❌ | ❌ | Milik Sendiri | ✅ | ❌ | ❌ |
 
 ---
 
-## 📋 Immutable Audit Log System (`AuditLog`)
+## 5. Sistem Audit Log Imutabel (`AuditLog`)
 
-### 1. Immutability Guarantee
-- **Append-Only Architecture**: The `AuditRepository` contract contains only `Create`, `List`, and `GetByID` methods. **No `Update` or `Delete` methods exist in the code or API endpoints.**
-- **Access Restrictions**: Audit logs are readable only by authorized organization Owners and Admins (`audit:read`).
-
-### 2. Audited System Events
-- **Authentication**: `user.login`, `user.login_failed`, `user.password_changed`
-- **RBAC & Memberships**: `member.role_changed`, `member.invited`, `member.removed`
-- **Settings & Resources**: `org.settings_updated`, `service.created`, `staff.updated`, `location.created`
-- **Transactions & Lifecycle**: `appointment.created`, `appointment.cancelled`, `payment.completed`, `refund.created`
-- **SaaS Billing**: `subscription.changed`, `subscription.cancelled`
+### Jaminan Imutabilitas Data Audit
+- **Arsitektur Append-Only**: Repositori `AuditRepository` hanya menyediakan metode `Create`, `List`, dan `GetByID`. **Tidak ada fungsi `Update` atau `Delete` dalam kode aplikasi maupun API.**
+- **Batasan Basis Data**: Aturan SQL PostgreSQL `BEFORE UPDATE OR DELETE` aktif pada tabel audit log untuk menggagalkan pembaruan data secara langsung.
+- **Hak Akses Khusus**: Log audit hanya dapat dibaca oleh pengguna dengan peran `Owner` dan `Admin` yang terverifikasi.
 
 ---
 
-## 🌐 Network Security & HTTP Defense-in-Depth
+## 6. Pertahanan Jaringan & Header HTTP
 
-### 1. HTTP Security Headers
-Every response emitted by the Appointly API server includes defense-in-depth security headers configured via [`SecurityHeaders`](file:///d:/appointly/backend/internal/middleware/middleware.go):
+Setiap respons dari server API Appointly menyertakan header keamanan berlapis:
+
 ```http
 X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
@@ -63,32 +81,30 @@ Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; 
 Permissions-Policy: camera=(), microphone=(), geolocation=()
 ```
 
-### 2. Rate Limiting Strategy
-- **Authenticated API Routes**: 120 requests / minute per IP.
-- **Public Booking Endpoints**: 60 requests / minute per IP.
-- **Authentication Routes (`/api/v1/auth/*`)**: 20 requests / minute per IP (protects against brute-force attacks).
+---
 
-### 3. Payload Size Limits & CSRF Protection
-- **Body Max Bytes**: Restricted to **2MB** per HTTP request via [`MaxBytes`](file:///d:/appointly/backend/internal/middleware/middleware.go) middleware to prevent memory exhaustion DoS.
-- **CSRF Token Header**: `X-CSRF-Token` header verification for cookie-authenticated state-changing requests.
+## 7. Pembatas Laju API (Rate Limiting)
 
-### 4. Webhook Signature Verification & Idempotency
-- Inbound payment and SaaS webhooks require HMAC SHA-256 signature validation (`X-Signature` or `X-Hub-Signature-256`).
-- Idempotency protection prevents duplicate event replay attacks.
+- **Endpoint API Terautentikasi**: Maksimal 120 permintaan / menit per IP.
+- **Endpoint Pemesanan Publik**: Maksimal 60 permintaan / menit per IP.
+- **Endpoint Autentikasi (`/api/v1/auth/*`)**: Maksimal 20 permintaan / menit per IP (Melindungi dari serangan *Brute-Force*).
 
 ---
 
-## 🧹 Sensitive Data Protection & Error Sanitization
+## 8. Keamanan Webhook & Idempotensi
 
-### 1. Password & Credentials Hashing
-- Passwords are encrypted using Argon2id / Bcrypt with cryptographically random salts.
-- Plaintext passwords, JWT tokens, session cookies, and payment provider secret keys are **never written to log output**.
-
-### 2. Error Response Sanitization
-- Production error responses utilize standard envelope format without exposing database schema details, SQL queries, or internal stack tracebacks.
+- Webhook masuk dari penyedia pembayaran atau layanan eksternal wajib memverifikasi tanda tangan HMAC SHA-256 (`X-Signature` / `X-Hub-Signature-256`).
+- Kunci idempotensi disimpan dalam Redis/Postgres untuk mencegah serangan pembalasan (*replay attacks*).
 
 ---
 
-## 📝 Vulnerability Reporting Policy
+## 9. Enkripsi & Pelindungan Data Sensitif
 
-If you discover a security vulnerability in Appointly, please submit a report to `security@appointly.app`. We take all security vulnerabilities seriously and will respond promptly.
+- **Enkripsi Kata Sandi**: Kata sandi di-hash menggunakan **Argon2id** / **Bcrypt** dengan *salt* acak kriptografis.
+- **Pembersihan Log (Log Sanitization)**: Kata sandi mentah, token JWT, cookie sesi, dan kunci rahasia webhook **dilarang keras dicatat ke dalam log**.
+
+---
+
+## 10. Pelaporan Kerentanan Keamanan
+
+Jika Anda menemukan kerentanan keamanan pada platform Appointly, harap kirimkan laporan lengkap ke tim keamanan kami melalui email: `security@appointly.app`. Tim kami akan merespons dalam waktu 24 jam.

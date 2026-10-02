@@ -1,363 +1,235 @@
-# Appointly — Architecture Decision Record
+# 🏗️ Dokumen Keputusan Arsitektur Sistem (Architecture Decision Record) — Appointly
 
-> **Version**: 0.1.0  
-> **Status**: Living Document  
-> **Last Updated**: 2026-10-02  
-
----
-
-## 1. System Overview
-
-**Appointly** is a production-ready, multi-tenant SaaS platform for appointment and online booking management. The initial vertical is salon/barbershop, but the architecture is **vertical-agnostic** — the same core can support clinics, consultants, lawyers, tutors, trainers, and other service businesses without redesigning the core database or booking engine.
-
-### Core Principles
-
-| Principle | Implementation |
-|---|---|
-| Multi-tenancy | Organization = tenant; every business record is tenant-isolated |
-| Vertical-agnostic | Generic `staff`, `service`, `resource` model; no vertical-specific tables in core |
-| Domain-driven | Clear domain boundaries; no shared mutable state between domains |
-| Layered architecture | Handler → Use Case → Domain → Repository |
-| Security-first | Auth, RBAC, CSRF, rate-limiting, audit log built-in from day one |
-| Observability | Structured logging, request IDs, health/readiness endpoints from day one |
+> **Versi**: 1.0.0  
+> **Status**: Dokumen Resmi Tingkat Produksi  
+> **Terakhir Diperbarui**: 2026-10-03  
 
 ---
 
-## 2. Technology Stack
+## 📑 Daftar Isi
 
-### Backend
-| Concern | Technology | Rationale |
-|---|---|---|
-| Language | Go 1.26+ | Performance, simplicity, strong stdlib, excellent concurrency |
-| HTTP Router | Chi | Lightweight, idiomatic, middleware-composable |
-| Database | PostgreSQL 16 | ACID, rich constraint system, JSONB where needed |
-| ORM/Query | sqlc + raw SQL | Type-safe queries without ORM magic, full control |
-| Migrations | golang-migrate | Reversible numbered migrations, CLI + embedded |
-| Cache/Queue | Redis 7 | Session store, distributed lock, pub/sub, background jobs |
-| Object Storage | MinIO (dev) / S3 (prod) | Blob storage for uploads/avatars |
-| Auth Tokens | JWT (access) + opaque refresh tokens | Stateless access, revocable refresh |
-| Password Hash | Argon2id | Memory-hard, OWASP recommended |
-| Background Jobs | River (Go) | Postgres-backed job queue, durable, transactional enqueue |
-| API Spec | OpenAPI 3.1 | Contract-first documentation |
-| Container | Docker + Compose | Consistent dev/prod parity |
-
-### Frontend
-| Concern | Technology | Rationale |
-|---|---|---|
-| Framework | Astro 5 | Islands architecture, partial hydration, fast static output |
-| Interactive | React 19 | Only where complex interaction needed (calendar, wizard, modals) |
-| Styling | Tailwind CSS 4 | Utility-first, consistent design tokens |
-| Server State | TanStack Query v5 | Cache, background refetch, optimistic updates |
-| Forms | React Hook Form + Zod | Schema-driven validation, minimal re-renders |
-| Type Safety | TypeScript 5.5 | End-to-end type safety |
-| HTTP Client | ky (fetch wrapper) | Tiny, interceptor-aware |
+- [1. Ikhtisar Sistem](#1-ikhtisar-sistem)
+- [2. Prinsip Arsitektur Utama](#2-prinsip-arsitektur-utama)
+- [3. Stack Teknologi & Rationale](#3-stack-teknologi--rationale)
+- [4. Struktur Repositori & Pola Lapisan Kode](#4-struktur-repositori--pola-lapisan-kode)
+- [5. Model Domain & Entitas Inti](#5-model-domain--entitas-inti)
+- [6. Aturan Isolasi Multi-Tenant](#6-aturan-isolasi-multi-tenant)
+- [7. Mesin Ketersediaan Dinamis (Availability Engine)](#7-mesin-ketersediaan-dinamis-availability-engine)
+- [8. Mekanisme Pencegahan Double-Booking Konkuren](#8-mekanisme-pencegahan-double-booking-konkuren)
+- [9. Desain API & Kontrak Respons](#9-desain-api--kontrak-respons)
+- [10. Kebijakan Keamanan & RBAC](#10-kebijakan-keamanan--rbac)
+- [11. Arsitektur Pekerja Latar Belakang & Asinkron](#11-arsitektur-pekerja-latar-belakang--asinkron)
+- [12. Matriks Keputusan Rekayasa (Decision Log)](#12-matriks-keputusan-rekayasa-decision-log)
 
 ---
 
-## 3. Repository Structure
+## 1. Ikhtisar Sistem
 
-```
+**Appointly** adalah platform *Software-as-a-Service* (SaaS) multi-tenant tingkat produksi yang dirancang untuk manajemen janji temu (*appointment*) dan pemesanan online (*online booking*). 
+
+Meskipun vertikal awal difokuskan pada industri jasa seperti Salon, Barbershop, dan Spa, arsitektur sistem dirancang secara **Agnostik Vertikal** (*vertical-agnostic*). Entitas inti menggunakan abstraksi generik seperti `staff`, `service`, `location`, dan `resource` sehingga sistem dapat melayani klinik kesehatan, konsultan hukum, lembaga bimbingan belajar, pusat kebugaran, dan penyedia jasa lainnya tanpa mengubah struktur skema basis data utama.
+
+---
+
+## 2. Prinsip Arsitektur Utama
+
+| Prinsip | Implementasi Teknis |
+| :--- | :--- |
+| **Isolasi Tenant Mutlak** | Organisasi (`Organization`) berfungsi sebagai tenant utama. Setiap kueri basis data dijamin terisolasi melalui konteks server `organization_id`. |
+| **Agnostik Vertikal** | Struktur data generik tanpa kolom khusus industri tertentu di skema basis data inti. |
+| **Desain Berbasis Domain (DDD)** | Batasan domain yang jelas (`Auth`, `Appointment`, `Payment`, `Scheduling`, `Subscription`, dll) tanpa *state* bersama yang dapat berubah (*no shared mutable state*). |
+| **Arsitektur Berlapis (Layered Architecture)** | Pemisahan tegas: **Handler/Transport** → **Use Case/Application** → **Domain Logic** → **Repository/Infrastructure**. |
+| **Transaksional & Idempotent** | Operasi penulisan kritis menggunakan transaksi basis data eksplisit dan kunci idempotensi untuk mencegah efek samping ganda. |
+| **Keamanan Terintegrasi (Security-by-Design)** | Autentikasi JWT, otorisasi RBAC, pembatasan laju (*rate-limiting*), dan audit log imutabel aktif secara *default*. |
+
+---
+
+## 3. Stack Teknologi & Rationale
+
+### 3.1 Backend Engine
+- **Bahasa Pemrograman**: **Go 1.26+** — Memberikan performa tinggi, efisiensi memori, serta manajemen konkurensi native yang andal melalui *goroutines*.
+- **Router HTTP**: **Chi Router** — Ringan, idiomatic Go, dan memiliki sistem composable middleware yang cepat.
+- **Basis Data Utama**: **PostgreSQL 16** — Menjamin integritas data berstandar ACID, mendukung tipe data JSONB untuk metadata fleksibel, dan memiliki constraint unik parsial yang kuat.
+- **Akses & Kueri SQL**: **sqlc + raw SQL** — Meng-generate kode Go *type-safe* langsung dari berkas query `.sql` tanpa overhead *reflection* ORM.
+- **Migrasi Basis Data**: **golang-migrate** — Pengelolaan skema basis data terversi secara otomatis dan eksplisit.
+- **Cache & Antrean**: **Redis 7** — Penyimpanan sesi, pembatas laju API, pub/sub, dan manajemen antrean kerja asinkron.
+- **Penyimpanan Berkas**: **MinIO (Dev) / AWS S3 (Prod)** — Penyimpanan objek terenkripsi untuk aset gambar dan dokumen.
+
+### 3.2 Frontend Application
+- **Framework Utama**: **Astro 5** — Menggunakan *Islands Architecture* untuk menghasilkan output statis HTML cepat dengan hidrasi parsial.
+- **Komponen Interaktif**: **React 19** — Digunakan pada komponen kompleks yang membutuhkan interaktivitas tinggi (Kalender interaktif, Wizard Pemesanan Publik, Modal Konfirmasi).
+- **Sistem Desain UI**: **Tailwind CSS v4** — Manajemen token visual terpusat (Warna HSL, Tipografi, Spacing, Shadow).
+- **State Server & Fetching**: **TanStack Query v5** — Manajemen status server, caching otomatis, dan pembaruan latar belakang.
+
+---
+
+## 4. Struktur Repositori & Pola Lapisan Kode
+
+```text
 appointly/
-├── backend/                    # Go service
+├── backend/
 │   ├── cmd/
-│   │   ├── api/               # API server entrypoint
-│   │   └── worker/            # Background worker entrypoint
+│   │   ├── api/               # Biner Server API HTTP
+│   │   └── worker/            # Biner Pengolah Pekerjaan Latar Belakang
 │   ├── internal/
-│   │   ├── config/            # Configuration loading (env-based)
-│   │   ├── server/            # HTTP server setup, middleware stack
-│   │   ├── domain/            # Domain models & interfaces (pure Go)
-│   │   │   ├── auth/
-│   │   │   ├── organization/
-│   │   │   ├── member/
-│   │   │   ├── rbac/
-│   │   │   ├── location/
-│   │   │   ├── staff/
-│   │   │   ├── service/
-│   │   │   ├── resource/
-│   │   │   ├── customer/
-│   │   │   ├── scheduling/
-│   │   │   ├── appointment/
-│   │   │   ├── payment/
-│   │   │   ├── notification/
-│   │   │   ├── subscription/
-│   │   │   ├── audit/
-│   │   │   └── webhook/
-│   │   ├── usecase/           # Application use cases (orchestration)
-│   │   ├── handler/           # HTTP handlers (transport layer)
+│   │   ├── config/            # Pemuatan Konfigurasi dari Environment
+│   │   ├── domain/            # Entitas Domain Murni & Interface Repositori
+│   │   ├── usecase/           # Orchestration Logika Bisnis Aplikasi
+│   │   ├── handler/           # Transport Layer HTTP (Penerjemah JSON/REST)
 │   │   │   └── v1/
-│   │   │       └── public/    # Public booking API
-│   │   ├── repository/        # Database implementations
-│   │   │   ├── postgres/
-│   │   │   └── redis/
-│   │   ├── worker/            # Background job handlers
-│   │   ├── middleware/        # HTTP middleware
-│   │   └── pkg/               # Internal shared packages
-│   │       ├── apperror/
-│   │       ├── logger/
-│   │       ├── validator/
-│   │       ├── pagination/
-│   │       ├── idgen/
-│   │       ├── timeutil/
-│   │       └── crypto/
-│   ├── db/
-│   │   ├── migrations/        # golang-migrate SQL files
-│   │   └── queries/           # sqlc .sql query files
-│   ├── gen/                   # sqlc generated code (committed)
-│   ├── api/
-│   │   └── openapi.yaml       # OpenAPI 3.1 spec
-│   ├── sqlc.yaml
-│   ├── go.mod
-│   └── go.sum
-│
-├── frontend/                  # Astro application
-│   ├── src/
-│   │   ├── pages/
-│   │   │   ├── index.astro           # Marketing home
-│   │   │   ├── features.astro
-│   │   │   ├── pricing.astro
-│   │   │   ├── login.astro
-│   │   │   ├── register.astro
-│   │   │   ├── dashboard/
-│   │   │   └── book/[slug]/
-│   │   ├── components/
-│   │   │   ├── marketing/
-│   │   │   ├── layout/
-│   │   │   ├── ui/
-│   │   │   └── features/
-│   │   ├── lib/
-│   │   │   ├── api/
-│   │   │   ├── auth/
-│   │   │   └── utils/
-│   │   ├── types/
-│   │   └── styles/
-│   ├── astro.config.mjs
-│   ├── tailwind.config.mjs
-│   ├── tsconfig.json
-│   └── package.json
-│
-├── infra/
-│   ├── docker/
-│   └── nginx/
-│
-├── docker-compose.yml
-├── docker-compose.prod.yml
-├── .env.example
-├── .gitignore
-├── Makefile
-├── README.md
-└── ARCHITECTURE.md
+│   │   │       └── public/    # API Pemesanan Publik Tanpa Auth
+│   │   ├── repository/        # Implementasi Akses Basis Data (Postgres/Redis)
+│   │   ├── infrastructure/   # Adaptor Provider Eksternal (Payment, Mail)
+│   │   ├── middleware/        # Middleware HTTP (Auth, RBAC, Tenant, Rate Limit)
+│   │   └── worker/            # Pengolah Job Antrean Asinkron
+│   └── db/
+│       ├── migrations/        # Berkas Migrasi SQL (000001 - 000008)
+│       └── queries/           # Berkas Kueri SQL sqlc
 ```
 
 ---
 
-## 4. Domain Model
+## 5. Model Domain & Entitas Inti
 
-### 4.1 Core Entities
+### Relasi Entitas Domain (ERD Conceptual)
 
-```
-Organization (tenant)
-  ├── has many Location
-  ├── has many OrganizationMember → User
-  ├── has many Staff
-  ├── has many ServiceCategory
-  ├── has many Service
-  ├── has many Resource
-  ├── has many Customer
-  ├── has many Appointment
-  ├── has many Webhook
-  └── has one Subscription → Plan
-
-User (identity/account)
-  └── has many OrganizationMember
-
-Staff (business entity, linked to User optionally)
-  ├── belongs to Organization
-  ├── optionally linked to User via user_id
-  ├── works at many Location (staff_locations)
-  └── provides many Service (staff_services)
-
-Service
-  ├── belongs to Organization
-  ├── belongs to ServiceCategory
-  ├── has duration, price, buffer_before, buffer_after
-  └── assigned to many Staff (staff_services)
-
-Resource (room, chair, equipment)
-  ├── belongs to Organization
-  ├── belongs to Location
-  └── can be required by Service (service_resources)
-
-Appointment
-  ├── belongs to Organization
-  ├── belongs to Location
-  ├── belongs to Service
-  ├── belongs to Staff
-  ├── optionally belongs to Customer
-  ├── optionally belongs to Resource
-  ├── has status: pending|confirmed|rescheduled|completed|cancelled|no_show
-  └── has many AppointmentStatusHistory
-
-Payment
-  ├── belongs to Appointment
-  ├── has status: pending|paid|failed|refunded|partially_refunded
-  └── has many Refund
-```
-
-### 4.2 Tenant Isolation Rules
-
-1. Every business entity carries `organization_id` (NOT NULL, FK).
-2. All repository queries MUST include `organization_id` from authenticated context.
-3. `organization_id` from client request body is **IGNORED** — it comes from the JWT/session.
-4. Row-level checks in critical paths use DB-level constraints.
-
-### 4.3 Availability Engine
-
-```
-Input:
-  - organization_id, service_id, staff_id (optional), location_id
-  - date_range, timezone
-
-Algorithm:
-  1. Load BusinessHours for location on requested date
-  2. Load StaffSchedule for each candidate staff on date
-  3. Load StaffTimeOff overlapping date range
-  4. Load existing Appointments (status: pending|confirmed|rescheduled)
-     with service duration + buffer_before + buffer_after
-  5. Load Resource availability if service requires resource
-  6. Apply BookingSettings (min_advance_notice, max_advance_days, slot_granularity)
-  7. Generate candidate slots at configured granularity
-  8. For each candidate slot: check all constraints → available/unavailable
-
-Race condition protection:
-  - SELECT ... FOR UPDATE on (staff_id, start_time) before inserting
-  - Unique partial index on appointments prevents double-booking at DB level
+```text
+Organization (Tenant)
+  ├── Location (Cabang / Lokasi Fisik)
+  ├── Staff (Profil Staf & Jam Kerja)
+  ├── Service (Katalog Layanan & Durasi)
+  ├── Resource (Ruangan, Alat, Meja)
+  ├── Customer (Basis Data Pelanggan)
+  ├── Appointment (Transaksi Pemesanan Janji Temu)
+  │     └── AppointmentStatusHistory (Riwayat Perubahan Status)
+  ├── Payment (Catatan Transaksi Pembayaran)
+  └── Subscription (Paket SaaS Organisasi)
 ```
 
 ---
 
-## 5. API Design
+## 6. Aturan Isolasi Multi-Tenant
 
-### URL Structure
-```
-/api/v1/                          # Authenticated API
-/api/v1/public/                   # Public (no auth, rate-limited)
-/health                           # Health check
-/ready                            # Readiness probe
-```
-
-### Auth Strategy
-- **Access Token**: JWT, 15 min TTL, HS256/RS256
-- **Refresh Token**: Opaque, stored in DB, httpOnly cookie
-- **CSRF**: Double-submit cookie for cookie-based auth
-- **Tenant context**: Extracted from JWT claims, never from request body
-
-### Standard Response Envelope
-```json
-{ "data": {...}, "meta": {"request_id": "...", "timestamp": "..."} }
-{ "data": [...], "meta": {"pagination": {"page":1,"per_page":20,"total":150}} }
-{ "error": {"code": "VALIDATION_FAILED", "message": "...", "details": [...]} }
-```
+1. **Atribut `organization_id` Mandatory**: Setiap tabel bisnis wajib memiliki kolom `organization_id` berindeks dengan Foreign Key `NOT NULL`.
+2. **Konteks Server Aman**: `organization_id` diekstrak dari token JWT pengguna terautentikasi dan disimpan dalam `context.Context`.
+3. **Penolakan Parameter Client**: Nilai `organization_id` yang dikirim dalam *request body* atau *query parameter* oleh klien **DIABAIKAN**.
+4. **Verifikasi Repositori**: Setiap klausa `SELECT`, `UPDATE`, dan `DELETE` pada repositori **WAJIB** mencantumkan `WHERE organization_id = $1`.
 
 ---
 
-## 6. Security Architecture
+## 7. Mesin Ketersediaan Dinamis (Availability Engine)
 
-| Layer | Control |
-|---|---|
-| Transport | TLS enforced in production |
-| Authentication | JWT + Refresh Token rotation |
-| Authorization | RBAC + Permission checks in use case layer |
-| Tenant Isolation | organization_id from context, never from client |
-| Rate Limiting | Token bucket per IP + per user |
-| CORS | Strict allowlist |
-| Input Validation | Schema validation, parameterized queries only |
-| Password | Argon2id |
-| Audit Log | Immutable append-only log |
-| Webhooks | HMAC-SHA256 signature verification |
+Mesin Ketersediaan (*Availability Engine*) berada pada `internal/usecase/availability`. Mesin ini menghitung slot waktu luang secara *real-time* tanpa mengandalkan tabel slot statis yang kaku.
 
----
+### Tahapan Algoritma Ketersediaan
 
-## 7. Background Job Architecture
-
-Jobs are enqueued transactionally using **River** (Postgres-backed):
-
-| Job | Trigger | Retry |
-|---|---|---|
-| `notification.email` | appointment/payment events | 5x exp backoff |
-| `notification.whatsapp` | appointment events | 3x exp backoff |
-| `notification.webhook` | all published events | 10x exp backoff |
-| `appointment.reminder` | cron, 24h/1h before | 3x |
-| `report.generate` | on-demand / scheduled | 2x |
-
----
-
-## 8. Decision Log
-
-| # | Decision | Rationale | Alternatives |
-|---|---|---|---|
-| 1 | Chi over Gin/Echo | Stdlib-compatible, minimal, composable | Gin, Echo |
-| 2 | sqlc over GORM | Type-safe, no reflection, explicit SQL | GORM, squirrel |
-| 3 | River for jobs | Transactional enqueue on Postgres | Asynq (Redis-only) |
-| 4 | Argon2id for passwords | OWASP recommended, memory-hard | bcrypt |
-| 5 | Single-schema multi-tenancy | Simpler ops, easier migrations | Per-tenant schema |
-| 6 | UUIDv7 for public IDs | Time-ordered, K-sortable | Auto-increment, UUIDv4 |
-| 7 | Astro Islands | Partial hydration, best perf | Next.js, pure SPA |
-| 8 | Selective soft delete | Only where audit/recovery needed | Universal soft delete |
-| 9 | Availability Engine | Stateless candidate slot pipeline; atomic lock at booking | Hardcoded static 30m slots |
-
----
-
-## 9. Availability Engine Architecture & Pipeline Algorithm
-
-The **Availability Engine** is a high-performance, stateless application service (`internal/usecase/availability`) designed to compute valid candidate booking slots dynamically.
-
-### Key Design Guarantee
-- **Dynamic Slot Generation**: Slot starts and durations are computed on-the-fly based on `service.DurationMinutes` + `service.BufferBefore` + `service.BufferAfter` stepped by configurable `organization.Settings.SlotGranularityMinutes` (e.g., 15m, 30m, 60m). Static hard-coded slot grids are strictly avoided.
-- **Candidate Non-Reservation**: Availability slots are stateless candidate suggestions. To prevent race conditions, the final appointment creation step performs an atomic transaction lock (`SELECT FOR UPDATE`) on the target staff and resource window.
-
-### Pipeline Algorithm Phases
-
-```
-[Query Input] (org, location, service, staff, date_range, timezone)
+```text
+[Input Kueri] (org_id, service_id, staff_id, location_id, date_range, timezone)
       │
       ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Phase 1: Service Status & Duration Calculation              │
-│ - Verify service.Status == ACTIVE                          │
-│ - totalSlotDuration = BufferBefore + Duration + BufferAfter │
+1. Verifikasi Layanan (Status Aktif & Durasi + Buffer)       │
 └──────────────────────────────┬──────────────────────────────┘
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Phase 2: Organization Settings & Advance Notice Bounds      │
-│ - earliestAllowed = now + MinAdvanceBookingHours            │
-│ - latestAllowed   = now + MaxAdvanceDays                    │
+2. Batas Pemesanan Organisasi (Min & Max Notice Hours)        │
 └──────────────────────────────┬──────────────────────────────┘
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Phase 3: Staff Candidates & Location Intersections          │
-│ - Filter ACTIVE staff assigned to the requested Service     │
-│ - Intersect Location Business Hours with Staff Shift Hours │
+3. Irisan Jam Operasional Lokasi & Shift Staf                 │
 └──────────────────────────────┬──────────────────────────────┘
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Phase 4: Time Window Subtractions (Pure Set Math)            │
-│ - Subtract Staff Breaks from shift windows                  │
-│ - Subtract Approved Staff Time-Off entries                  │
-│ - Subtract Existing Appointments + Buffer Windows           │
+4. Pengurangan Window Waktu (Jam Istirahat, Time-Off, Appt)   │
 └──────────────────────────────┬──────────────────────────────┘
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Phase 5: Resource Constraints & Granular Slot Step          │
-│ - Verify at least 1 assigned Resource is ACTIVE & free      │
-│ - Iterate t in steps of SlotGranularityMinutes              │
-│ - Filter slots within [earliestAllowed, latestAllowed]      │
+5. Verifikasi Ketersediaan Sumber Daya (Resource)             │
 └──────────────────────────────┬──────────────────────────────┘
                                │
                                ▼
-[Formatted & Chronologically Sorted Slots Output]
+[Output Slot Waktu Siap Pesan (Chronologically Sorted)]
 ```
 
+---
+
+## 8. Mekanisme Pencegahan Double-Booking Konkuren
+
+Untuk mencegah dua permintaan pemesanan secara bersamaan memilih slot waktu dan staf yang sama (*race condition*):
+
+1. **Penguncian Baris Transaksi (`SELECT FOR UPDATE`)**:
+   Saat transaksi booking dimulai, sistem mengunci baris jadwal staf yang relevan dalam blok `BEGIN ... COMMIT`.
+2. **Indeks Unik Parsial Basis Data**:
+   PostgreSQL menegakkan batasan keunikan pada tabel `appointments`:
+   ```sql
+   CREATE UNIQUE INDEX idx_appointments_no_double_book 
+   ON appointments (organization_id, staff_id, start_time) 
+   WHERE status IN ('pending', 'confirmed', 'rescheduled');
+   ```
+
+---
+
+## 9. Desain API & Kontrak Respons
+
+Seluruh respons API mengembalikan struktur *envelope* JSON yang konsisten:
+
+### Respons Sukses
+```json
+{
+  "data": {
+    "id": "appt_12345",
+    "status": "confirmed",
+    "start_time": "2026-10-05T09:00:00Z"
+  },
+  "meta": {
+    "request_id": "req-987123",
+    "timestamp": "2026-10-03T03:50:00Z"
+  }
+}
+```
+
+### Respons Gagal / Error
+```json
+{
+  "error": {
+    "code": "SLOT_UNAVAILABLE",
+    "message": "Slot waktu yang dipilih telah dipesan oleh pelanggan lain.",
+    "details": []
+  }
+}
+```
+
+---
+
+## 10. Kebijakan Keamanan & RBAC
+
+- **Argon2id Password Hashing**: Kata sandi dienkripsi menggunakan algoritma ramah-memori Argon2id.
+- **Hirarki Hak Akses (RBAC)**:
+  - `Owner`: Akses penuh organisasi, pengaturan keuangan, dan log audit.
+  - `Admin`: Akses manajemen operasional, staf, layanan, dan janji temu.
+  - `Staff`: Akses melihat dan mengelola janji temu yang ditugaskan (*assigned*).
+- **Headers Keamanan HTTP**: Memasang `X-Content-Type-Options`, `X-Frame-Options`, `Content-Security-Policy`, dan `HSTS`.
+
+---
+
+## 11. Arsitektur Pekerja Latar Belakang & Asinkron
+
+Pekerjaan latar belakang (*background jobs*) dikirim secara asinkron setelah transaksi basis data berhasil commit:
+
+- **Pengiriman Email & Notification**: Notifikasi janji temu dan pengingat (*reminder*).
+- **Pemrosesan Webhook**: Mengirim event perubahan status ke URL Webhook tenant dengan strategi pengulangan (*exponential backoff*).
+
+---
+
+## 12. Matriks Keputusan Rekayasa (Decision Log)
+
+| No | Keputusan Teknis | Alasan Utama | Alternatif yang Ditolak |
+| :--- | :--- | :--- | :--- |
+| 1 | **Chi Router** | Performa tinggi, idiomatik, kompatibel dengan `http.Handler` standar. | Gin / Echo |
+| 2 | **sqlc + PostgreSQL** | Kueri aman tipe (*type-safe*), bebas overhead reflection ORM. | GORM / Ent |
+| 3 | **Single Schema Multi-Tenancy** | Pemeliharaan migrasi basis data yang mudah dan efisien pada koneksi pool. | Schema Per-Tenant |
+| 4 | **Astro + React Islands** | Menghasilkan bundel JavaScript minimal di sisi klien dengan rendering cepat. | Next.js SPA |
