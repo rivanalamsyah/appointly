@@ -1,0 +1,13 @@
+---
+/**
+ * Admin Dashboard — External Integrations & Connectors Page
+ */
+import DashboardLayout from '@/components/layout/DashboardLayout.astro';
+import IntegrationsManager from '@/components/features/settings/IntegrationsManager';
+---
+
+<DashboardLayout title="External Integrations">
+  <div class="space-y-6">
+    <IntegrationsManager client:load />
+  </div>
+</DashboardLayout>

@@ -15,6 +15,7 @@ import (
 
 	"github.com/appointly/appointly/backend/internal/config"
 	"github.com/appointly/appointly/backend/internal/handler/v1/audit"
+	"github.com/appointly/appointly/backend/internal/handler/v1/integration"
 	"github.com/appointly/appointly/backend/internal/handler/v1/public"
 	"github.com/appointly/appointly/backend/internal/handler/v1/subscription"
 	"github.com/appointly/appointly/backend/internal/middleware"
@@ -36,6 +37,7 @@ type Dependencies struct {
 	PublicHandler       *public.PublicHandler
 	SubscriptionHandler *subscription.Handler
 	AuditHandler        *audit.Handler
+	IntegrationHandler  *integration.Handler
 }
 
 // New creates a new Server with the given dependencies.
@@ -170,6 +172,11 @@ func (s *Server) setupRoutes(r *chi.Mux, deps Dependencies) {
 			// Audit Logs (Immutable)
 			if deps.AuditHandler != nil {
 				deps.AuditHandler.RegisterRoutes(r)
+			}
+
+			// External Integrations & Webhooks
+			if deps.IntegrationHandler != nil {
+				deps.IntegrationHandler.RegisterRoutes(r)
 			}
 		})
 
