@@ -70,3 +70,14 @@ func TenantFromContext(ctx context.Context) (TenantContext, error) {
 	}
 	return TenantContext{}, apperror.Unauthorized("tenant context missing from request")
 }
+
+// OrgIDFromContext extracts organization ID string from TenantContext or auth context.
+func OrgIDFromContext(ctx context.Context) string {
+	if tc, ok := ctx.Value(tenantCtxKey).(TenantContext); ok && tc.ID != uuid.Nil {
+		return tc.ID.String()
+	}
+	if claims := ClaimsFromContext(ctx); claims != nil && claims.OrgID != uuid.Nil {
+		return claims.OrgID.String()
+	}
+	return ""
+}

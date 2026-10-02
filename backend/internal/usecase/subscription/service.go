@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
+	"github.com/appointly/appointly/backend/internal/domain/audit"
 	"github.com/appointly/appointly/backend/internal/domain/subscription"
 	"github.com/appointly/appointly/backend/internal/pkg/apperror"
 )
@@ -15,17 +16,19 @@ import (
 // Service handles SaaS subscription management and backend plan limit enforcement.
 type Service struct {
 	subRepo           subscription.Repository
+	auditRepo         audit.Repository
 	webhookSecretKey  string
 	processedWebhooks map[string]bool
 }
 
 // NewService constructs a new Subscription Service.
-func NewService(subRepo subscription.Repository, webhookSecret string) *Service {
+func NewService(subRepo subscription.Repository, auditRepo audit.Repository, webhookSecret string) *Service {
 	if webhookSecret == "" {
 		webhookSecret = "saas-sub-secret-appointly"
 	}
 	return &Service{
 		subRepo:           subRepo,
+		auditRepo:         auditRepo,
 		webhookSecretKey:  webhookSecret,
 		processedWebhooks: make(map[string]bool),
 	}
@@ -157,12 +160,35 @@ func (s *Service) UpgradePlan(ctx context.Context, orgID uuid.UUID, planSlug str
 		BillingPeriod:  period,
 	}
 
-	return s.subRepo.ChangePlan(ctx, cmd)
+	sub, err := s.subRepo.ChangePlan(ctx, cmd)
+	if err == nil && s.auditRepo != nil {
+		_ = s.auditRepo.Create(ctx, audit.AuditLog{
+			ID:             uuid.New(),
+			OrganizationID: &orgID,
+			Action:         audit.ActionSubscriptionChanged,
+			ResourceType:   "subscription",
+			ResourceID:     &sub.ID,
+			Metadata: map[string]interface{}{
+				"plan_slug": planSlug,
+				"period":    string(period),
+			},
+		})
+	}
+	return sub, err
 }
 
 // CancelSubscription cancels the current active subscription.
 func (s *Service) CancelSubscription(ctx context.Context, orgID uuid.UUID) error {
-	return s.subRepo.Cancel(ctx, orgID)
+	err := s.subRepo.Cancel(ctx, orgID)
+	if err == nil && s.auditRepo != nil {
+		_ = s.auditRepo.Create(ctx, audit.AuditLog{
+			ID:             uuid.New(),
+			OrganizationID: &orgID,
+			Action:         audit.ActionSubscriptionCancelled,
+			ResourceType:   "subscription",
+		})
+	}
+	return err
 }
 
 // HandleSaaSHook processes inbound SaaS billing webhooks.

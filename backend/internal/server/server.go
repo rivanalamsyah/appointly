@@ -14,6 +14,7 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 
 	"github.com/appointly/appointly/backend/internal/config"
+	"github.com/appointly/appointly/backend/internal/handler/v1/audit"
 	"github.com/appointly/appointly/backend/internal/handler/v1/public"
 	"github.com/appointly/appointly/backend/internal/handler/v1/subscription"
 	"github.com/appointly/appointly/backend/internal/middleware"
@@ -34,6 +35,7 @@ type Dependencies struct {
 	Logger              *logger.Logger
 	PublicHandler       *public.PublicHandler
 	SubscriptionHandler *subscription.Handler
+	AuditHandler        *audit.Handler
 }
 
 // New creates a new Server with the given dependencies.
@@ -76,6 +78,15 @@ func (s *Server) Shutdown(ctx context.Context) error {
 func (s *Server) setupMiddleware(r *chi.Mux, deps Dependencies) {
 	// Request ID — must be first so all subsequent middleware can use it
 	r.Use(middleware.RequestID)
+
+	// Security Headers (CSP, X-Frame-Options, X-Content-Type-Options, etc.)
+	r.Use(middleware.SecurityHeaders)
+
+	// Request Payload Size Limit (Max 2MB)
+	r.Use(middleware.MaxBytes(2))
+
+	// CSRF Protection for state-changing endpoints
+	r.Use(middleware.CSRFProtection)
 
 	// Structured request logging
 	r.Use(middleware.RequestLogger(deps.Logger))
@@ -155,6 +166,11 @@ func (s *Server) setupRoutes(r *chi.Mux, deps Dependencies) {
 			r.Route("/locations", func(r chi.Router) {
 				// TODO: location routes
 			})
+
+			// Audit Logs (Immutable)
+			if deps.AuditHandler != nil {
+				deps.AuditHandler.RegisterRoutes(r)
+			}
 		})
 
 		// Public booking API & SaaS Subscriptions

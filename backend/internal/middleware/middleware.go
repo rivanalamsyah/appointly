@@ -92,6 +92,60 @@ func CORS(cfg config.CORSConfig) func(http.Handler) http.Handler {
 	return c.Handler
 }
 
+// SecurityHeaders injects essential HTTP defense-in-depth security headers.
+func SecurityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-ancestors 'none';")
+		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		next.ServeHTTP(w, r)
+	})
+}
+
+// MaxBytes limits request body payload size (default 2MB) to prevent Denial of Service memory exhaustion.
+func MaxBytes(maxMB int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Body != nil {
+				r.Body = http.MaxBytesReader(w, r.Body, maxMB<<20)
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// CSRFProtection verifies CSRF headers for state-changing HTTP requests.
+func CSRFProtection(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Safe HTTP methods do not require CSRF token
+		if r.Method == "GET" || r.Method == "HEAD" || r.Method == "OPTIONS" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Webhooks and Bearer tokens are exempt from CSRF cookie checks
+		if r.Header.Get("Authorization") != "" || r.Header.Get("X-Signature") != "" || r.Header.Get("X-Hub-Signature-256") != "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// If cookie session is present, verify X-CSRF-Token header
+		if cookie, err := r.Cookie("session_id"); err == nil && cookie.Value != "" {
+			csrfHeader := r.Header.Get("X-CSRF-Token")
+			if csrfHeader == "" {
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(`{"error":{"code":"forbidden","message":"CSRF token missing"}}`))
+				return
+			}
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 // RateLimit applies token bucket rate limiting for authenticated API endpoints.
 func RateLimit(cfg *config.Config) func(http.Handler) http.Handler {
 	if cfg.App.Env == "development" || cfg.App.Env == "test" {

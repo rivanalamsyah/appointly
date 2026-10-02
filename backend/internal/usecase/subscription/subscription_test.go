@@ -28,8 +28,9 @@ func setupTestSubscriptionService(t *testing.T) (
 	locRepo := memory.NewLocationRepository()
 	apptRepo := memory.NewAppointmentRepository()
 	subRepo := memory.NewSubscriptionRepository(staffRepo, locRepo, apptRepo)
+	auditRepo := memory.NewAuditRepository()
 
-	subSvc := subuc.NewService(subRepo, "mock-sub-secret")
+	subSvc := subuc.NewService(subRepo, auditRepo, "mock-sub-secret")
 
 	org, err := orgRepo.Create(context.Background(), &organization.Organization{
 		ID:       uuid.New(),
